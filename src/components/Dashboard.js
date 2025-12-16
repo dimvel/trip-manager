@@ -3,15 +3,18 @@ import React, { useState, useEffect } from 'react';
 import TripList from './TripList';
 import TripForm from './TripForm';
 import ContactsManager from './ContactsManager';
+import ParticipantManager from './ParticipantManager';
 import { getUpcomingTrips, getArchivedTrips, autoArchiveTrips } from '../services/database';
 
 const Dashboard = ({ user, onLogout }) => {
     const [activeTab, setActiveTab] = useState('upcoming');
     const [showTripForm, setShowTripForm] = useState(false);
     const [showContacts, setShowContacts] = useState(false);
+    const [showParticipants, setShowParticipants] = useState(false);
     const [upcomingTrips, setUpcomingTrips] = useState([]);
     const [archivedTrips, setArchivedTrips] = useState([]);
     const [editingTrip, setEditingTrip] = useState(null);
+    const [managingTrip, setManagingTrip] = useState(null);
 
     useEffect(() => {
         loadTrips();
@@ -47,12 +50,33 @@ const Dashboard = ({ user, onLogout }) => {
         setShowTripForm(true);
     };
 
+    const handleManageParticipants = (trip) => {
+        setManagingTrip(trip);
+        setShowParticipants(true);
+    };
+
+    const handleParticipantsBack = () => {
+        setShowParticipants(false);
+        setManagingTrip(null);
+        loadTrips();
+    };
+
     if (showContacts) {
         return (
             <ContactsManager
                 onBack={() => setShowContacts(false)}
                 user={user}
                 onLogout={onLogout}
+            />
+        );
+    }
+
+    if (showParticipants && managingTrip) {
+        return (
+            <ParticipantManager
+                trip={managingTrip}
+                onBack={handleParticipantsBack}
+                onUpdate={handleParticipantsBack}
             />
         );
     }
@@ -120,6 +144,7 @@ const Dashboard = ({ user, onLogout }) => {
                         trips={upcomingTrips}
                         onRefresh={loadTrips}
                         onEdit={handleEditTrip}
+                        onManageParticipants={handleManageParticipants}
                         type="upcoming"
                     />
                 ) : (
@@ -127,6 +152,7 @@ const Dashboard = ({ user, onLogout }) => {
                         trips={archivedTrips}
                         onRefresh={loadTrips}
                         onEdit={handleEditTrip}
+                        onManageParticipants={handleManageParticipants}
                         type="archived"
                     />
                 )}
@@ -169,7 +195,7 @@ const styles = {
     },
     logoutBtn: {
         padding: '10px 20px',
-        backgroundColor: '#ff6b6b',
+        backgroundColor: '#e03131',
         color: 'white',
         border: 'none',
         borderRadius: '8px',

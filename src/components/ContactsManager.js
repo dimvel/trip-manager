@@ -315,7 +315,7 @@ const styles = {
     },
     logoutBtn: {
         padding: '10px 20px',
-        backgroundColor: '#ff6b6b',
+        backgroundColor: '#e03131',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
@@ -486,7 +486,7 @@ const styles = {
     },
     editBtnSmall: {
         padding: '6px 12px',
-        backgroundColor: '#ff922b',
+        backgroundColor: '#4c6ef5',
         color: 'white',
         border: 'none',
         borderRadius: '6px',
@@ -496,7 +496,7 @@ const styles = {
     },
     deleteBtnSmall: {
         padding: '6px 12px',
-        backgroundColor: '#ff6b6b',
+        backgroundColor: '#e03131',
         color: 'white',
         border: 'none',
         borderRadius: '6px',
@@ -510,7 +510,7 @@ const styles = {
     },
     confirmYes: {
         padding: '6px 16px',
-        backgroundColor: '#ff6b6b',
+        backgroundColor: '#e03131',
         color: 'white',
         border: 'none',
         borderRadius: '6px',

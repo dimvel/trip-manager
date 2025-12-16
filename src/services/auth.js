@@ -1,4 +1,7 @@
 // src/services/auth.js
+// Optional separate authentication service
+// NOTE: This functionality is already included in database.js
+// Use this only if you want to separate concerns
 
 import PouchDB from 'pouchdb';
 
@@ -251,7 +254,7 @@ export const verifyPassword = async (password, hash) => {
 // Export the database instance if needed elsewhere
 export { usersDB };
 
-export default {
+const authService = {
     initializeDefaultUsers,
     authenticateUser,
     getUserByUsername,
@@ -263,3 +266,5 @@ export default {
     hashPassword,
     verifyPassword
 };
+
+export default authService;

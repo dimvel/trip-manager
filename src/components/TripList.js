@@ -1,10 +1,9 @@
 // src/components/TripList.js
 import React, { useState } from 'react';
 import { deleteTrip, searchTrips, getAllContacts } from '../services/database';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { generateTripPDF } from '../services/pdfService';
 
-const TripList = ({ trips, onRefresh, onEdit, type }) => {
+const TripList = ({ trips, onRefresh, onEdit, onManageParticipants, type }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -34,47 +33,18 @@ const TripList = ({ trips, onRefresh, onEdit, type }) => {
         onRefresh();
     };
 
-    const generatePDF = async (trip) => {
-        const doc = new jsPDF();
+    const handleGeneratePDF = async (trip) => {
+        try {
+            const allContacts = await getAllContacts();
+            const result = generateTripPDF(trip, allContacts);
 
-        // Get all contacts to get full details
-        const allContacts = await getAllContacts();
-        const participantDetails = trip.participants.map(pId =>
-            allContacts.find(c => c._id === pId)
-        ).filter(Boolean);
-
-        // Title
-        doc.setFontSize(20);
-        doc.setTextColor(102, 126, 234);
-        doc.text('Αναφορά Εκδρομής', 105, 20, { align: 'center' });
-
-        // Trip Info
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Όνομα: ${trip.name}`, 20, 40);
-        doc.text(`Ημερομηνία: ${new Date(trip.date).toLocaleDateString('el-GR')}`, 20, 50);
-        doc.text(`Τοποθεσίες: ${trip.locations.join(', ')}`, 20, 60);
-        doc.text(`Συνολικοί Συμμετέχοντες: ${participantDetails.length}`, 20, 70);
-
-        // Participants Table
-        const tableData = participantDetails.map((p, idx) => [
-            idx + 1,
-            p.firstName,
-            p.lastName,
-            p.phone || 'Μη διαθέσιμο'
-        ]);
-
-        doc.autoTable({
-            startY: 80,
-            head: [['#', 'Όνομα', 'Επώνυμο', 'Τηλέφωνο']],
-            body: tableData,
-            theme: 'grid',
-            headStyles: { fillColor: [102, 126, 234] },
-            styles: { font: 'helvetica', fontSize: 10 }
-        });
-
-        // Save PDF
-        doc.save(`ekdromi_${trip.name}_${Date.now()}.pdf`);
+            if (!result.success) {
+                alert('Σφάλμα κατά τη δημιουργία του PDF');
+            }
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            alert('Σφάλμα κατά τη δημιουργία του PDF');
+        }
     };
 
     const formatDate = (dateString) => {
@@ -144,19 +114,29 @@ const TripList = ({ trips, onRefresh, onEdit, type }) => {
 
                             <div style={styles.cardActions}>
                                 <button
-                                    onClick={() => generatePDF(trip)}
+                                    onClick={() => handleGeneratePDF(trip)}
                                     style={styles.pdfBtn}
+                                    title="Εξαγωγή σε PDF"
                                 >
                                     📄 PDF
                                 </button>
 
                                 {type === 'upcoming' && (
-                                    <button
-                                        onClick={() => onEdit(trip)}
-                                        style={styles.editBtn}
-                                    >
-                                        ✏️ Επεξεργασία
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={() => onManageParticipants(trip)}
+                                            style={styles.manageBtn}
+                                            title="Διαχείριση Παρουσιών & Σημειώσεων"
+                                        >
+                                            ✓ Συμμετέχοντες
+                                        </button>
+                                        <button
+                                            onClick={() => onEdit(trip)}
+                                            style={styles.editBtn}
+                                        >
+                                            ✏️ Επεξεργασία
+                                        </button>
+                                    </>
                                 )}
 
                                 <button
@@ -294,6 +274,16 @@ const styles = {
         gap: '8px',
         flexWrap: 'wrap'
     },
+    manageBtn: {
+        padding: '8px 16px',
+        backgroundColor: '#51cf66',
+        color: 'white',
+        border: 'none',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: '500'
+    },
     pdfBtn: {
         padding: '8px 16px',
         backgroundColor: '#339af0',
@@ -306,7 +296,7 @@ const styles = {
     },
     editBtn: {
         padding: '8px 16px',
-        backgroundColor: '#ff922b',
+        backgroundColor: '#4c6ef5',
         color: 'white',
         border: 'none',
         borderRadius: '6px',
@@ -316,7 +306,7 @@ const styles = {
     },
     deleteBtn: {
         padding: '8px 16px',
-        backgroundColor: '#ff6b6b',
+        backgroundColor: '#e03131',
         color: 'white',
         border: 'none',
         borderRadius: '6px',

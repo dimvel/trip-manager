@@ -1,7 +1,8 @@
 // src/services/database.js
+// Updated version with participant checklist and notes support
+
 import PouchDB from 'pouchdb';
 import PouchDBFind from 'pouchdb-find';
-import { usersDB } from './auth';
 
 PouchDB.plugin(PouchDBFind);
 
@@ -9,7 +10,10 @@ PouchDB.plugin(PouchDBFind);
 const tripsDB = new PouchDB('trips');
 const contactsDB = new PouchDB('contacts');
 
-// Contacts CRUD
+// ============================================
+// CONTACTS CRUD
+// ============================================
+
 export const addContact = async (contact) => {
     try {
         const doc = {
@@ -69,13 +73,29 @@ export const importContactsFromCSV = async (contacts) => {
     }
 };
 
-// Trips CRUD
+// ============================================
+// TRIPS CRUD (with participant details)
+// ============================================
+
 export const addTrip = async (trip) => {
     try {
+        // Convert participants to new format if needed
+        const formattedParticipants = trip.participants.map(p => {
+            if (typeof p === 'string') {
+                // Old format: just contactId
+                return { contactId: p, checked: true, notes: '' };
+            }
+            // New format: already has structure
+            return p;
+        });
+
         const doc = {
             _id: `trip_${Date.now()}`,
-            ...trip,
-            status: 'upcoming', // upcoming or archived
+            name: trip.name,
+            date: trip.date,
+            locations: trip.locations,
+            participants: formattedParticipants,
+            status: 'upcoming',
             createdAt: new Date().toISOString()
         };
         return await tripsDB.put(doc);
@@ -88,7 +108,7 @@ export const addTrip = async (trip) => {
 export const getAllTrips = async () => {
     try {
         const result = await tripsDB.allDocs({ include_docs: true });
-        return result.rows.map(row => row.doc);
+        return result.rows.map(row => migrateParticipantFormat(row.doc));
     } catch (error) {
         console.error('Error fetching trips:', error);
         return [];
@@ -100,7 +120,7 @@ export const getUpcomingTrips = async () => {
         const result = await tripsDB.find({
             selector: { status: 'upcoming' }
         });
-        return result.docs;
+        return result.docs.map(doc => migrateParticipantFormat(doc));
     } catch (error) {
         console.error('Error fetching upcoming trips:', error);
         return [];
@@ -112,7 +132,7 @@ export const getArchivedTrips = async () => {
         const result = await tripsDB.find({
             selector: { status: 'archived' }
         });
-        return result.docs;
+        return result.docs.map(doc => migrateParticipantFormat(doc));
     } catch (error) {
         console.error('Error fetching archived trips:', error);
         return [];
@@ -121,7 +141,24 @@ export const getArchivedTrips = async () => {
 
 export const updateTrip = async (trip) => {
     try {
-        return await tripsDB.put(trip);
+        // Ensure participants are in correct format
+        const formattedParticipants = trip.participants.map(p => {
+            if (typeof p === 'string') {
+                return { contactId: p, checked: true, notes: '' };
+            }
+            return {
+                contactId: p.contactId,
+                checked: p.checked !== undefined ? p.checked : true,
+                notes: p.notes || ''
+            };
+        });
+
+        const updatedTrip = {
+            ...trip,
+            participants: formattedParticipants
+        };
+
+        return await tripsDB.put(updatedTrip);
     } catch (error) {
         console.error('Error updating trip:', error);
         throw error;
@@ -138,7 +175,69 @@ export const deleteTrip = async (tripId) => {
     }
 };
 
-// Auto-archive trips (run daily)
+// Helper: Migrate old participant format to new format
+const migrateParticipantFormat = (trip) => {
+    if (!trip.participants || trip.participants.length === 0) {
+        return trip;
+    }
+
+    // Check if already in new format
+    if (typeof trip.participants[0] === 'object' && trip.participants[0].contactId) {
+        return trip;
+    }
+
+    // Migrate from old format (array of strings) to new format
+    trip.participants = trip.participants.map(p => ({
+        contactId: p,
+        checked: true,
+        notes: ''
+    }));
+
+    return trip;
+};
+
+// ============================================
+// PARTICIPANT MANAGEMENT
+// ============================================
+
+export const updateParticipantStatus = async (tripId, contactId, checked) => {
+    try {
+        const trip = await tripsDB.get(tripId);
+        const participant = trip.participants.find(p => p.contactId === contactId);
+
+        if (participant) {
+            participant.checked = checked;
+            await tripsDB.put(trip);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error updating participant status:', error);
+        throw error;
+    }
+};
+
+export const updateParticipantNotes = async (tripId, contactId, notes) => {
+    try {
+        const trip = await tripsDB.get(tripId);
+        const participant = trip.participants.find(p => p.contactId === contactId);
+
+        if (participant) {
+            participant.notes = notes.substring(0, 500); // Limit to 500 chars
+            await tripsDB.put(trip);
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error updating participant notes:', error);
+        throw error;
+    }
+};
+
+// ============================================
+// AUTO-ARCHIVE
+// ============================================
+
 export const autoArchiveTrips = async () => {
     try {
         const trips = await getUpcomingTrips();
@@ -162,7 +261,10 @@ export const autoArchiveTrips = async () => {
     }
 };
 
-// Search trips
+// ============================================
+// SEARCH
+// ============================================
+
 export const searchTrips = async (searchTerm, startDate, endDate) => {
     try {
         const allTrips = await getAllTrips();
@@ -181,4 +283,4 @@ export const searchTrips = async (searchTerm, startDate, endDate) => {
     }
 };
 
-export { usersDB, tripsDB, contactsDB };
+export { tripsDB, contactsDB };

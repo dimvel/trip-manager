@@ -208,7 +208,7 @@ const styles = {
     },
     logoutBtn: {
         padding: '10px 20px',
-        backgroundColor: '#ff6b6b',
+        backgroundColor: '#e03131',
         color: 'white',
         border: 'none',
         borderRadius: '8px',
