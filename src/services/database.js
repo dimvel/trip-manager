@@ -6,7 +6,6 @@ import { usersDB } from './auth';
 PouchDB.plugin(PouchDBFind);
 
 // Initialize databases
-const usersDB = new PouchDB('users');
 const tripsDB = new PouchDB('trips');
 const contactsDB = new PouchDB('contacts');
 
