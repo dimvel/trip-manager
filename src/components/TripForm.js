@@ -20,7 +20,7 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
             setDate(trip.date);
             setLocations(trip.locations.join(', '));
 
-            // Extract only contactIds from participants (keep existing checked ones)
+            // Extract ALL contactIds from participants (both checked and unchecked)
             const participantIds = trip.participants.map(p =>
                 typeof p === 'string' ? p : p.contactId
             );
@@ -50,11 +50,31 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
         }
 
         // Format participants as objects with checked status
-        const formattedParticipants = participants.map(contactId => ({
-            contactId,
-            checked: true, // New participants always start as checked
-            notes: ''
-        }));
+        const formattedParticipants = participants.map(contactId => {
+            // If editing, preserve existing checked status
+            if (trip) {
+                const existingParticipant = trip.participants.find(p => {
+                    const pId = typeof p === 'string' ? p : p.contactId;
+                    return pId === contactId;
+                });
+
+                if (existingParticipant && typeof existingParticipant === 'object') {
+                    // Preserve existing status and notes
+                    return {
+                        contactId,
+                        checked: existingParticipant.checked,
+                        notes: existingParticipant.notes || ''
+                    };
+                }
+            }
+
+            // New participant - default to checked
+            return {
+                contactId,
+                checked: true,
+                notes: ''
+            };
+        });
 
         const tripData = {
             name,
