@@ -1,131 +1,128 @@
-// src/components/ContactsManager.js
+// src/components/TripForm.js
 import React, { useState, useEffect } from 'react';
-import Papa from 'papaparse';
-import {
-    getAllContacts,
-    addContact,
-    updateContact,
-    deleteContact,
-    importContactsFromCSV
-} from '../services/database';
+import { addTrip, updateTrip, getAllContacts } from '../services/database';
 
-const ContactsManager = ({ onBack, user, onLogout }) => {
-    const [contacts, setContacts] = useState([]);
-    const [showForm, setShowForm] = useState(false);
-    const [editingContact, setEditingContact] = useState(null);
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [phone, setPhone] = useState('');
+const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
+    const [name, setName] = useState('');
+    const [date, setDate] = useState('');
+    const [locations, setLocations] = useState('');
+    const [participants, setParticipants] = useState([]);
+    const [allContacts, setAllContacts] = useState([]);
     const [error, setError] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const contactsPerPage = 10;
+    const maxContacts = 1000;
 
     useEffect(() => {
         loadContacts();
-    }, []);
+        if (trip) {
+            setName(trip.name);
+            setDate(trip.date);
+            setLocations(trip.locations.join(', '));
+
+            // Extract only contactIds from participants (keep existing checked ones)
+            const participantIds = trip.participants.map(p =>
+                typeof p === 'string' ? p : p.contactId
+            );
+            setParticipants(participantIds);
+        }
+    }, [trip]);
 
     const loadContacts = async () => {
-        const allContacts = await getAllContacts();
-        setContacts(allContacts);
+        const contacts = await getAllContacts();
+        setAllContacts(contacts);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
-        if (!firstName || !lastName) {
-            setError('Το όνομα και επώνυμο είναι υποχρεωτικά');
+        if (!name || !date || !locations) {
+            setError('Παρακαλώ συμπληρώστε όλα τα υποχρεωτικά πεδία');
             return;
         }
 
-        const contactData = { firstName, lastName, phone };
+        const locationArray = locations.split(',').map(loc => loc.trim()).filter(Boolean);
+
+        if (locationArray.length === 0) {
+            setError('Προσθέστε τουλάχιστον μία τοποθεσία');
+            return;
+        }
+
+        // Format participants as objects with checked status
+        const formattedParticipants = participants.map(contactId => ({
+            contactId,
+            checked: true, // New participants always start as checked
+            notes: ''
+        }));
+
+        const tripData = {
+            name,
+            date,
+            locations: locationArray,
+            participants: formattedParticipants,
+            status: 'upcoming'
+        };
 
         try {
-            if (editingContact) {
-                await updateContact({ ...editingContact, ...contactData });
+            if (trip) {
+                await updateTrip({ ...trip, ...tripData });
             } else {
-                await addContact(contactData);
+                await addTrip(tripData);
             }
-            resetForm();
-            loadContacts();
+            onSave();
         } catch (err) {
-            setError('Σφάλμα κατά την αποθήκευση');
+            setError(err.message || 'Σφάλμα κατά την αποθήκευση');
         }
     };
 
-    const resetForm = () => {
-        setFirstName('');
-        setLastName('');
-        setPhone('');
-        setEditingContact(null);
-        setShowForm(false);
-        setError('');
-    };
-
-    const handleEdit = (contact) => {
-        setEditingContact(contact);
-        setFirstName(contact.firstName);
-        setLastName(contact.lastName);
-        setPhone(contact.phone || '');
-        setShowForm(true);
-    };
-
-    const handleDelete = async (contactId) => {
-        try {
-            await deleteContact(contactId);
-            setShowDeleteConfirm(null);
-            loadContacts();
-        } catch (err) {
-            setError('Σφάλμα κατά τη διαγραφή');
+    const toggleParticipant = (contactId) => {
+        if (participants.includes(contactId)) {
+            setParticipants(participants.filter(id => id !== contactId));
+        } else {
+            setParticipants([...participants, contactId]);
         }
     };
 
-    const handleFileImport = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    // Pagination logic
+    const displayedContacts = allContacts.slice(0, maxContacts);
 
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: async (results) => {
-                const validContacts = results.data
-                    .filter(row => row.firstName && row.lastName)
-                    .map(row => ({
-                        firstName: row.firstName?.trim() || row['Όνομα']?.trim(),
-                        lastName: row.lastName?.trim() || row['Επώνυμο']?.trim(),
-                        phone: row.phone?.trim() || row['Τηλέφωνο']?.trim() || ''
-                    }))
-                    .filter(c => c.firstName && c.lastName);
+    const totalPages = Math.ceil(displayedContacts.length / contactsPerPage);
 
-                if (validContacts.length === 0) {
-                    setError('Δεν βρέθηκαν έγκυρες επαφές στο αρχείο');
-                    return;
-                }
-
-                try {
-                    await importContactsFromCSV(validContacts);
-                    loadContacts();
-                    alert(`Εισήχθησαν επιτυχώς ${validContacts.length} επαφές!`);
-                } catch (err) {
-                    setError('Σφάλμα κατά την εισαγωγή');
-                }
-            },
-            error: () => {
-                setError('Σφάλμα ανάγνωσης αρχείου');
-            }
-        });
-        e.target.value = '';
-    };
-
-    const filteredContacts = contacts.filter(contact =>
-        `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (contact.phone && contact.phone.includes(searchTerm))
+    const paginatedContacts = displayedContacts.slice(
+        (currentPage - 1) * contactsPerPage,
+        currentPage * contactsPerPage
     );
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // Generate page numbers to display (show max 10 page buttons)
+    const getPageNumbers = () => {
+        const maxPageButtons = 10;
+        if (totalPages <= maxPageButtons) {
+            return [...Array(totalPages)].map((_, i) => i + 1);
+        }
+
+        const halfButtons = Math.floor(maxPageButtons / 2);
+        let startPage = Math.max(1, currentPage - halfButtons);
+        let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+
+        if (endPage - startPage < maxPageButtons - 1) {
+            startPage = Math.max(1, endPage - maxPageButtons + 1);
+        }
+
+        return [...Array(endPage - startPage + 1)].map((_, i) => startPage + i);
+    };
 
     return (
         <div style={styles.container}>
             <header style={styles.header}>
-                <h1 style={styles.title}>Διαχείριση Επαφών</h1>
+                <h1 style={styles.title}>
+                    {trip ? 'Επεξεργασία Εκδρομής' : 'Νέα Εκδρομή'}
+                </h1>
                 <div style={styles.headerRight}>
                     <span style={styles.username}>{user.username}</span>
                     <button onClick={onLogout} style={styles.logoutBtn}>
@@ -134,148 +131,173 @@ const ContactsManager = ({ onBack, user, onLogout }) => {
                 </div>
             </header>
 
-            <div style={styles.actions}>
-                <button onClick={onBack} style={styles.backBtn}>
-                    ← Πίσω
-                </button>
-                <button onClick={() => setShowForm(!showForm)} style={styles.addBtn}>
-                    + Νέα Επαφή
-                </button>
-                <label style={styles.importBtn}>
-                    📥 Εισαγωγή CSV/Excel
-                    <input
-                        type="file"
-                        accept=".csv,.xlsx,.xls"
-                        onChange={handleFileImport}
-                        style={{ display: 'none' }}
-                    />
-                </label>
-            </div>
+            <div style={styles.formContainer}>
+                <form onSubmit={handleSubmit} style={styles.form}>
+                    <div style={styles.section}>
+                        <h2 style={styles.sectionTitle}>Βασικές Πληροφορίες</h2>
 
-            {showForm && (
-                <div style={styles.formContainer}>
-                    <h2 style={styles.formTitle}>
-                        {editingContact ? 'Επεξεργασία Επαφής' : 'Νέα Επαφή'}
-                    </h2>
-                    <form onSubmit={handleSubmit} style={styles.form}>
-                        <div style={styles.formRow}>
-                            <div style={styles.inputGroup}>
-                                <label style={styles.label}>Όνομα *</label>
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Όνομα Εκδρομής *</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                style={styles.input}
+                                placeholder="π.χ. Εκδρομή στα Μετέωρα"
+                            />
+                        </div>
+
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Ημερομηνία *</label>
+                            <div style={styles.dateInputWrapper}>
                                 <input
-                                    type="text"
-                                    value={firstName}
-                                    onChange={(e) => setFirstName(e.target.value)}
-                                    style={styles.input}
-                                    placeholder="Όνομα"
+                                    type="date"
+                                    value={date}
+                                    onChange={(e) => setDate(e.target.value)}
+                                    style={styles.dateInput}
+                                    onClick={(e) => e.target.showPicker && e.target.showPicker()}
                                 />
-                            </div>
-                            <div style={styles.inputGroup}>
-                                <label style={styles.label}>Επώνυμο *</label>
-                                <input
-                                    type="text"
-                                    value={lastName}
-                                    onChange={(e) => setLastName(e.target.value)}
-                                    style={styles.input}
-                                    placeholder="Επώνυμο"
-                                />
-                            </div>
-                            <div style={styles.inputGroup}>
-                                <label style={styles.label}>Τηλέφωνο</label>
-                                <input
-                                    type="tel"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    style={styles.input}
-                                    placeholder="Τηλέφωνο"
-                                />
+                                <span style={styles.calendarIcon}>📅</span>
                             </div>
                         </div>
-                        {error && <div style={styles.error}>{error}</div>}
-                        <div style={styles.formActions}>
-                            <button type="submit" style={styles.saveBtn}>
-                                Αποθήκευση
-                            </button>
-                            <button type="button" onClick={resetForm} style={styles.cancelBtn}>
-                                Ακύρωση
-                            </button>
+
+                        <div style={styles.inputGroup}>
+                            <label style={styles.label}>Τοποθεσίες * (χωρίστε με κόμμα)</label>
+                            <input
+                                type="text"
+                                value={locations}
+                                onChange={(e) => setLocations(e.target.value)}
+                                style={styles.input}
+                                placeholder="π.χ. Καλαμπάκα, Μετέωρα, Τρίκαλα"
+                            />
                         </div>
-                    </form>
-                </div>
-            )}
-
-            <div style={styles.searchContainer}>
-                <input
-                    type="text"
-                    placeholder="Αναζήτηση επαφών..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    style={styles.searchInput}
-                />
-                <div style={styles.contactCount}>
-                    Σύνολο: {filteredContacts.length} επαφές
-                </div>
-            </div>
-
-            <div style={styles.tableContainer}>
-                {filteredContacts.length === 0 ? (
-                    <div style={styles.emptyState}>
-                        Δεν υπάρχουν επαφές
                     </div>
-                ) : (
-                    <table style={styles.table}>
-                        <thead>
-                        <tr>
-                            <th style={styles.th}>Όνομα</th>
-                            <th style={styles.th}>Επώνυμο</th>
-                            <th style={styles.th}>Τηλέφωνο</th>
-                            <th style={styles.th}>Ενέργειες</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {filteredContacts.map(contact => (
-                            <tr key={contact._id} style={styles.tr}>
-                                <td style={styles.td}>{contact.firstName}</td>
-                                <td style={styles.td}>{contact.lastName}</td>
-                                <td style={styles.td}>{contact.phone || '-'}</td>
-                                <td style={styles.td}>
-                                    {showDeleteConfirm === contact._id ? (
-                                        <div style={styles.confirmInline}>
-                                            <span style={{marginRight: '10px'}}>Σίγουρα;</span>
-                                            <button
-                                                onClick={() => handleDelete(contact._id)}
-                                                style={styles.confirmYes}
-                                            >
-                                                Ναι
-                                            </button>
-                                            <button
-                                                onClick={() => setShowDeleteConfirm(null)}
-                                                style={styles.confirmNo}
-                                            >
-                                                Όχι
-                                            </button>
+
+                    <div style={styles.section}>
+                        <h2 style={styles.sectionTitle}>
+                            Συμμετέχοντες ({participants.length} επιλεγμένοι)
+                        </h2>
+
+                        {allContacts.length === 0 ? (
+                            <p style={styles.noContacts}>
+                                Δεν υπάρχουν διαθέσιμες επαφές. Προσθέστε επαφές πρώτα από τη Διαχείριση Επαφών.
+                            </p>
+                        ) : (
+                            <>
+                                {allContacts.length > maxContacts && (
+                                    <div style={styles.limitWarning}>
+                                        ⚠️ Εμφανίζονται οι πρώτες {maxContacts} επαφές από {allContacts.length} συνολικά
+                                    </div>
+                                )}
+
+                                <div style={styles.contactsGrid}>
+                                    {paginatedContacts.map(contact => (
+                                        <div
+                                            key={contact._id}
+                                            onClick={() => toggleParticipant(contact._id)}
+                                            style={{
+                                                ...styles.contactCard,
+                                                ...(participants.includes(contact._id) ? styles.selectedContact : {})
+                                            }}
+                                        >
+                                            <div style={styles.checkbox}>
+                                                {participants.includes(contact._id) ? '✓' : ''}
+                                            </div>
+                                            <div>
+                                                <div style={styles.contactName}>
+                                                    {contact.firstName} {contact.lastName}
+                                                </div>
+                                                {contact.phone && (
+                                                    <div style={styles.contactPhone}>{contact.phone}</div>
+                                                )}
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => handleEdit(contact)}
-                                                style={styles.editBtnSmall}
-                                            >
-                                                ✏️
-                                            </button>
-                                            <button
-                                                onClick={() => setShowDeleteConfirm(contact._id)}
-                                                style={styles.deleteBtnSmall}
-                                            >
-                                                🗑️
-                                            </button>
-                                        </>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        </tbody>
-                    </table>
-                )}
+                                    ))}
+                                </div>
+
+                                {totalPages > 1 && (
+                                    <div style={styles.pagination}>
+                                        <button
+                                            onClick={() => handlePageChange(1)}
+                                            disabled={currentPage === 1}
+                                            style={{
+                                                ...styles.pageBtn,
+                                                ...(currentPage === 1 ? styles.pageBtnDisabled : {})
+                                            }}
+                                        >
+                                            ⏮️ Πρώτη
+                                        </button>
+
+                                        <button
+                                            onClick={() => handlePageChange(currentPage - 1)}
+                                            disabled={currentPage === 1}
+                                            style={{
+                                                ...styles.pageBtn,
+                                                ...(currentPage === 1 ? styles.pageBtnDisabled : {})
+                                            }}
+                                        >
+                                            ← Προηγούμενη
+                                        </button>
+
+                                        <div style={styles.pageNumbers}>
+                                            {getPageNumbers().map(pageNum => (
+                                                <button
+                                                    key={pageNum}
+                                                    onClick={() => handlePageChange(pageNum)}
+                                                    style={{
+                                                        ...styles.pageNumber,
+                                                        ...(currentPage === pageNum ? styles.pageNumberActive : {})
+                                                    }}
+                                                >
+                                                    {pageNum}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            onClick={() => handlePageChange(currentPage + 1)}
+                                            disabled={currentPage === totalPages}
+                                            style={{
+                                                ...styles.pageBtn,
+                                                ...(currentPage === totalPages ? styles.pageBtnDisabled : {})
+                                            }}
+                                        >
+                                            Επόμενη →
+                                        </button>
+
+                                        <button
+                                            onClick={() => handlePageChange(totalPages)}
+                                            disabled={currentPage === totalPages}
+                                            style={{
+                                                ...styles.pageBtn,
+                                                ...(currentPage === totalPages ? styles.pageBtnDisabled : {})
+                                            }}
+                                        >
+                                            Τελευταία ⏭️
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div style={styles.pageInfo}>
+                                    Σελίδα {currentPage} από {totalPages} •
+                                    Εμφάνιση {((currentPage - 1) * contactsPerPage) + 1}-{Math.min(currentPage * contactsPerPage, displayedContacts.length)} από {displayedContacts.length} επαφές
+                                    {participants.length > 0 && ` • ${participants.length} επιλεγμένοι`}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {error && <div style={styles.error}>{error}</div>}
+
+                    <div style={styles.actions}>
+                        <button type="submit" style={styles.saveBtn}>
+                            {trip ? 'Ενημέρωση' : 'Δημιουργία'} Εκδρομής
+                        </button>
+                        <button type="button" onClick={onCancel} style={styles.cancelBtn}>
+                            Ακύρωση
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
@@ -323,211 +345,212 @@ const styles = {
         fontSize: '14px',
         fontWeight: '500'
     },
-    actions: {
-        display: 'flex',
-        gap: '15px',
-        marginBottom: '20px',
-        flexWrap: 'wrap'
-    },
-    backBtn: {
-        padding: '12px 24px',
-        backgroundColor: '#95a5a6',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontSize: '15px',
-        fontWeight: '500'
-    },
-    addBtn: {
-        padding: '12px 24px',
-        backgroundColor: '#51cf66',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontSize: '15px',
-        fontWeight: '500'
-    },
-    importBtn: {
-        padding: '12px 24px',
-        backgroundColor: '#339af0',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontSize: '15px',
-        fontWeight: '500',
-        display: 'inline-block'
-    },
     formContainer: {
         backgroundColor: 'white',
         borderRadius: '12px',
-        padding: '25px',
-        marginBottom: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-    },
-    formTitle: {
-        margin: '0 0 20px 0',
-        color: '#333',
-        fontSize: '20px'
+        padding: '30px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        maxWidth: '1000px',
+        margin: '0 auto'
     },
     form: {
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px'
+        gap: '30px'
     },
-    formRow: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '15px'
+    section: {
+        borderBottom: '2px solid #f0f0f0',
+        paddingBottom: '25px'
+    },
+    sectionTitle: {
+        color: '#333',
+        fontSize: '20px',
+        marginBottom: '20px',
+        fontWeight: 'bold'
     },
     inputGroup: {
-        display: 'flex',
-        flexDirection: 'column'
+        marginBottom: '20px'
     },
     label: {
-        marginBottom: '6px',
+        display: 'block',
+        marginBottom: '8px',
         color: '#555',
         fontWeight: '500',
-        fontSize: '14px'
+        fontSize: '15px'
     },
     input: {
-        padding: '10px',
+        width: '100%',
+        padding: '12px',
         border: '2px solid #e0e0e0',
+        borderRadius: '8px',
+        fontSize: '15px',
+        boxSizing: 'border-box'
+    },
+    dateInputWrapper: {
+        position: 'relative',
+        width: '100%'
+    },
+    dateInput: {
+        width: '100%',
+        padding: '12px',
+        paddingRight: '40px',
+        border: '2px solid #e0e0e0',
+        borderRadius: '8px',
+        fontSize: '15px',
+        boxSizing: 'border-box',
+        cursor: 'pointer'
+    },
+    calendarIcon: {
+        position: 'absolute',
+        right: '12px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        fontSize: '20px',
+        pointerEvents: 'none'
+    },
+    noContacts: {
+        padding: '30px',
+        textAlign: 'center',
+        color: '#999',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '8px'
+    },
+    contactsGrid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+        gap: '12px',
+        marginBottom: '20px'
+    },
+    contactCard: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '15px',
+        border: '2px solid #e0e0e0',
+        borderRadius: '10px',
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+        backgroundColor: 'white'
+    },
+    selectedContact: {
+        borderColor: '#51cf66',
+        backgroundColor: '#e7fcef'
+    },
+    checkbox: {
+        width: '24px',
+        height: '24px',
+        border: '2px solid #51cf66',
         borderRadius: '6px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#51cf66',
+        fontWeight: 'bold',
+        fontSize: '16px',
+        flexShrink: 0
+    },
+    contactName: {
+        fontWeight: '600',
+        color: '#333',
         fontSize: '15px'
+    },
+    contactPhone: {
+        fontSize: '13px',
+        color: '#777',
+        marginTop: '4px'
     },
     error: {
         backgroundColor: '#fee',
         color: '#c33',
-        padding: '12px',
+        padding: '15px',
         borderRadius: '8px',
-        textAlign: 'center'
+        textAlign: 'center',
+        fontWeight: '500'
     },
-    formActions: {
+    actions: {
         display: 'flex',
-        gap: '10px'
+        gap: '15px',
+        justifyContent: 'center',
+        paddingTop: '10px'
     },
     saveBtn: {
-        padding: '12px 30px',
+        padding: '14px 40px',
         backgroundColor: '#51cf66',
         color: 'white',
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: '10px',
         cursor: 'pointer',
-        fontWeight: '500'
+        fontSize: '16px',
+        fontWeight: 'bold',
+        boxShadow: '0 4px 12px rgba(81,207,102,0.3)'
     },
     cancelBtn: {
-        padding: '12px 30px',
+        padding: '14px 40px',
         backgroundColor: '#95a5a6',
         color: 'white',
         border: 'none',
-        borderRadius: '8px',
+        borderRadius: '10px',
         cursor: 'pointer',
-        fontWeight: '500'
+        fontSize: '16px',
+        fontWeight: 'bold'
     },
-    searchContainer: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '20px',
+    limitWarning: {
+        backgroundColor: '#fff3cd',
+        color: '#856404',
+        padding: '12px',
+        borderRadius: '8px',
+        marginBottom: '15px',
+        fontSize: '14px',
+        textAlign: 'center'
+    },
+    pagination: {
         display: 'flex',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'center',
-        gap: '15px',
+        marginTop: '20px',
+        marginBottom: '15px',
+        gap: '10px',
         flexWrap: 'wrap'
     },
-    searchInput: {
-        flex: 1,
-        minWidth: '250px',
-        padding: '12px',
-        border: '2px solid #e0e0e0',
+    pageBtn: {
+        padding: '10px 20px',
+        backgroundColor: '#667eea',
+        color: 'white',
+        border: 'none',
         borderRadius: '8px',
-        fontSize: '15px'
-    },
-    contactCount: {
-        color: '#667eea',
-        fontWeight: 'bold',
-        fontSize: '16px'
-    },
-    tableContainer: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        overflowX: 'auto'
-    },
-    table: {
-        width: '100%',
-        borderCollapse: 'collapse'
-    },
-    th: {
-        textAlign: 'left',
-        padding: '15px',
-        borderBottom: '2px solid #e0e0e0',
-        color: '#555',
-        fontWeight: 'bold',
-        fontSize: '15px'
-    },
-    tr: {
-        borderBottom: '1px solid #f0f0f0'
-    },
-    td: {
-        padding: '15px',
-        color: '#333',
-        fontSize: '15px'
-    },
-    emptyState: {
-        textAlign: 'center',
-        padding: '60px 20px',
-        color: '#999',
-        fontSize: '18px'
-    },
-    editBtnSmall: {
-        padding: '6px 12px',
-        backgroundColor: '#4c6ef5',
-        color: 'white',
-        border: 'none',
-        borderRadius: '6px',
         cursor: 'pointer',
-        marginRight: '8px',
-        fontSize: '14px'
+        fontSize: '14px',
+        fontWeight: '500'
     },
-    deleteBtnSmall: {
-        padding: '6px 12px',
-        backgroundColor: '#e03131',
-        color: 'white',
-        border: 'none',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        fontSize: '14px'
+    pageBtnDisabled: {
+        backgroundColor: '#ccc',
+        cursor: 'not-allowed'
     },
-    confirmInline: {
+    pageNumbers: {
         display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
+        gap: '5px',
+        flexWrap: 'wrap'
     },
-    confirmYes: {
-        padding: '6px 16px',
-        backgroundColor: '#e03131',
-        color: 'white',
-        border: 'none',
+    pageNumber: {
+        padding: '8px 12px',
+        backgroundColor: 'white',
+        color: '#667eea',
+        border: '2px solid #667eea',
         borderRadius: '6px',
         cursor: 'pointer',
-        fontSize: '13px',
-        fontWeight: 'bold'
+        fontSize: '14px',
+        fontWeight: '500'
     },
-    confirmNo: {
-        padding: '6px 16px',
-        backgroundColor: '#51cf66',
-        color: 'white',
-        border: 'none',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        fontSize: '13px',
-        fontWeight: 'bold'
+    pageNumberActive: {
+        backgroundColor: '#667eea',
+        color: 'white'
+    },
+    pageInfo: {
+        textAlign: 'center',
+        color: '#777',
+        fontSize: '14px',
+        marginTop: '10px'
     }
 };
 
-export default ContactsManager;
+export default TripForm;
