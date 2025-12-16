@@ -66,20 +66,28 @@ const TripList = ({ trips, onRefresh, onEdit, onManageParticipants, type }) => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     style={styles.searchInput}
                 />
-                <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    style={styles.dateInput}
-                    placeholder="Από ημερομηνία"
-                />
-                <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    style={styles.dateInput}
-                    placeholder="Έως ημερομηνία"
-                />
+                <div style={styles.dateInputWrapper}>
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        style={styles.dateInputWithIcon}
+                        placeholder="Από ημερομηνία"
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                    />
+                    <span style={styles.calendarIcon}>📅</span>
+                </div>
+                <div style={styles.dateInputWrapper}>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        style={styles.dateInputWithIcon}
+                        placeholder="Έως ημερομηνία"
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                    />
+                    <span style={styles.calendarIcon}>📅</span>
+                </div>
                 <button onClick={handleSearch} style={styles.searchBtn}>
                     Αναζήτηση
                 </button>
@@ -191,6 +199,30 @@ const styles = {
         borderRadius: '8px',
         fontSize: '14px',
         minWidth: '200px'
+    },
+    dateInputWrapper: {
+        position: 'relative',
+        flex: '1',
+        minWidth: '150px'
+    },
+    dateInputWithIcon: {
+        width: '100%',
+        padding: '10px',
+        paddingRight: '35px',
+        border: '2px solid #e0e0e0',
+        borderRadius: '8px',
+        fontSize: '14px',
+        cursor: 'pointer',
+        boxSizing: 'border-box'
+    },
+    calendarIcon: {
+        position: 'absolute',
+        right: '10px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        fontSize: '18px',
+        pointerEvents: 'none',
+        color: '#667eea'
     },
     dateInput: {
         flex: '1',

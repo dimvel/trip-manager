@@ -1,482 +1,254 @@
-// src/components/ContactsManager.js
-import React, { useState, useEffect } from 'react';
-import Papa from 'papaparse';
-import {
-    getAllContacts,
-    addContact,
-    updateContact,
-    deleteContact,
-    importContactsFromCSV
-} from '../services/database';
+// src/components/TripList.js
+import React, { useState } from 'react';
+import { deleteTrip, searchTrips, getAllContacts } from '../services/database';
+import { generateTripPDF } from '../services/pdfService';
 
-const ContactsManager = ({ onBack, user, onLogout }) => {
-    const [contacts, setContacts] = useState([]);
-    const [showForm, setShowForm] = useState(false);
-    const [editingContact, setEditingContact] = useState(null);
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [phone, setPhone] = useState('');
-    const [error, setError] = useState('');
+const TripList = ({ trips, onRefresh, onEdit, onManageParticipants, type }) => {
     const [searchTerm, setSearchTerm] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [filteredTrips, setFilteredTrips] = useState(trips);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
 
-    useEffect(() => {
-        loadContacts();
-    }, []);
+    React.useEffect(() => {
+        setFilteredTrips(trips);
+    }, [trips]);
 
-    const loadContacts = async () => {
-        const allContacts = await getAllContacts();
-        setContacts(allContacts);
+    const handleSearch = async () => {
+        const results = await searchTrips(searchTerm, startDate, endDate);
+        const filtered = results.filter(trip => trip.status === type);
+        setFilteredTrips(filtered);
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
+    const handleReset = () => {
+        setSearchTerm('');
+        setStartDate('');
+        setEndDate('');
+        setFilteredTrips(trips);
+    };
 
-        if (!firstName || !lastName) {
-            setError('Το όνομα και επώνυμο είναι υποχρεωτικά');
-            return;
-        }
+    const handleDelete = async (tripId) => {
+        await deleteTrip(tripId);
+        setShowDeleteConfirm(null);
+        onRefresh();
+    };
 
-        const contactData = { firstName, lastName, phone };
-
+    const handleGeneratePDF = async (trip) => {
         try {
-            if (editingContact) {
-                await updateContact({ ...editingContact, ...contactData });
-            } else {
-                await addContact(contactData);
+            const allContacts = await getAllContacts();
+            const result = generateTripPDF(trip, allContacts);
+
+            if (!result.success) {
+                alert('Σφάλμα κατά τη δημιουργία του PDF');
             }
-            resetForm();
-            loadContacts();
-        } catch (err) {
-            setError('Σφάλμα κατά την αποθήκευση');
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            alert('Σφάλμα κατά τη δημιουργία του PDF');
         }
     };
 
-    const resetForm = () => {
-        setFirstName('');
-        setLastName('');
-        setPhone('');
-        setEditingContact(null);
-        setShowForm(false);
-        setError('');
-    };
-
-    const handleEdit = (contact) => {
-        setEditingContact(contact);
-        setFirstName(contact.firstName);
-        setLastName(contact.lastName);
-        setPhone(contact.phone || '');
-        setShowForm(true);
-    };
-
-    const handleDelete = async (contactId) => {
-        try {
-            await deleteContact(contactId);
-            setShowDeleteConfirm(null);
-            loadContacts();
-        } catch (err) {
-            setError('Σφάλμα κατά τη διαγραφή');
-        }
-    };
-
-    const handleFileImport = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: async (results) => {
-                const validContacts = results.data
-                    .filter(row => row.firstName && row.lastName)
-                    .map(row => ({
-                        firstName: row.firstName?.trim() || row['Όνομα']?.trim(),
-                        lastName: row.lastName?.trim() || row['Επώνυμο']?.trim(),
-                        phone: row.phone?.trim() || row['Τηλέφωνο']?.trim() || ''
-                    }))
-                    .filter(c => c.firstName && c.lastName);
-
-                if (validContacts.length === 0) {
-                    setError('Δεν βρέθηκαν έγκυρες επαφές στο αρχείο');
-                    return;
-                }
-
-                try {
-                    await importContactsFromCSV(validContacts);
-                    loadContacts();
-                    alert(`Εισήχθησαν επιτυχώς ${validContacts.length} επαφές!`);
-                } catch (err) {
-                    setError('Σφάλμα κατά την εισαγωγή');
-                }
-            },
-            error: () => {
-                setError('Σφάλμα ανάγνωσης αρχείου');
-            }
+    const formatDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('el-GR', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
         });
-        e.target.value = '';
     };
-
-    const filteredContacts = contacts.filter(contact =>
-        `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (contact.phone && contact.phone.includes(searchTerm))
-    );
 
     return (
-        <div style={styles.container}>
-            <header style={styles.header}>
-                <h1 style={styles.title}>Διαχείριση Επαφών</h1>
-                <div style={styles.headerRight}>
-                    <span style={styles.username}>{user.username}</span>
-                    <button onClick={onLogout} style={styles.logoutBtn}>
-                        Αποσύνδεση
-                    </button>
-                </div>
-            </header>
-
-            <div style={styles.actions}>
-                <button onClick={onBack} style={styles.backBtn}>
-                    ← Πίσω
-                </button>
-                <button onClick={() => setShowForm(!showForm)} style={styles.addBtn}>
-                    + Νέα Επαφή
-                </button>
-                <label style={styles.importBtn}>
-                    📥 Εισαγωγή CSV/Excel
-                    <input
-                        type="file"
-                        accept=".csv,.xlsx,.xls"
-                        onChange={handleFileImport}
-                        style={{ display: 'none' }}
-                    />
-                </label>
-            </div>
-
-            {showForm && (
-                <div style={styles.formContainer}>
-                    <h2 style={styles.formTitle}>
-                        {editingContact ? 'Επεξεργασία Επαφής' : 'Νέα Επαφή'}
-                    </h2>
-                    <form onSubmit={handleSubmit} style={styles.form}>
-                        <div style={styles.formRow}>
-                            <div style={styles.inputGroup}>
-                                <label style={styles.label}>Όνομα *</label>
-                                <input
-                                    type="text"
-                                    value={firstName}
-                                    onChange={(e) => setFirstName(e.target.value)}
-                                    style={styles.input}
-                                    placeholder="Όνομα"
-                                />
-                            </div>
-                            <div style={styles.inputGroup}>
-                                <label style={styles.label}>Επώνυμο *</label>
-                                <input
-                                    type="text"
-                                    value={lastName}
-                                    onChange={(e) => setLastName(e.target.value)}
-                                    style={styles.input}
-                                    placeholder="Επώνυμο"
-                                />
-                            </div>
-                            <div style={styles.inputGroup}>
-                                <label style={styles.label}>Τηλέφωνο</label>
-                                <input
-                                    type="tel"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    style={styles.input}
-                                    placeholder="Τηλέφωνο"
-                                />
-                            </div>
-                        </div>
-                        {error && <div style={styles.error}>{error}</div>}
-                        <div style={styles.formActions}>
-                            <button type="submit" style={styles.saveBtn}>
-                                Αποθήκευση
-                            </button>
-                            <button type="button" onClick={resetForm} style={styles.cancelBtn}>
-                                Ακύρωση
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            <div style={styles.searchContainer}>
+        <div>
+            <div style={styles.searchBar}>
                 <input
                     type="text"
-                    placeholder="Αναζήτηση επαφών..."
+                    placeholder="Αναζήτηση ονόματος εκδρομής..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     style={styles.searchInput}
                 />
-                <div style={styles.contactCount}>
-                    Σύνολο: {filteredContacts.length} επαφές
+                <div style={styles.dateInputWrapper}>
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        style={styles.dateInputWithIcon}
+                        placeholder="Από ημερομηνία"
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                    />
+                    <span style={styles.calendarIcon}>📅</span>
                 </div>
+                <div style={styles.dateInputWrapper}>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        style={styles.dateInputWithIcon}
+                        placeholder="Έως ημερομηνία"
+                        onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                    />
+                    <span style={styles.calendarIcon}>📅</span>
+                </div>
+                <button onClick={handleSearch} style={styles.searchBtn}>
+                    Αναζήτηση
+                </button>
+                <button onClick={handleReset} style={styles.resetBtn}>
+                    Επαναφορά
+                </button>
             </div>
 
-            <div style={styles.tableContainer}>
-                {filteredContacts.length === 0 ? (
-                    <div style={styles.emptyState}>
-                        Δεν υπάρχουν επαφές
-                    </div>
-                ) : (
-                    <table style={styles.table}>
-                        <thead>
-                        <tr>
-                            <th style={styles.th}>Όνομα</th>
-                            <th style={styles.th}>Επώνυμο</th>
-                            <th style={styles.th}>Τηλέφωνο</th>
-                            <th style={styles.th}>Ενέργειες</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {filteredContacts.map(contact => (
-                            <tr key={contact._id} style={styles.tr}>
-                                <td style={styles.td}>{contact.firstName}</td>
-                                <td style={styles.td}>{contact.lastName}</td>
-                                <td style={styles.td}>{contact.phone || '-'}</td>
-                                <td style={styles.td}>
-                                    {showDeleteConfirm === contact._id ? (
-                                        <div style={styles.confirmInline}>
-                                            <span style={{marginRight: '10px'}}>Σίγουρα;</span>
-                                            <button
-                                                onClick={() => handleDelete(contact._id)}
-                                                style={styles.confirmYes}
-                                            >
-                                                Ναι
-                                            </button>
-                                            <button
-                                                onClick={() => setShowDeleteConfirm(null)}
-                                                style={styles.confirmNo}
-                                            >
-                                                Όχι
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => handleEdit(contact)}
-                                                style={styles.editBtnSmall}
-                                            >
-                                                ✏️
-                                            </button>
-                                            <button
-                                                onClick={() => setShowDeleteConfirm(contact._id)}
-                                                style={styles.deleteBtnSmall}
-                                            >
-                                                🗑️
-                                            </button>
-                                        </>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+            {filteredTrips.length === 0 ? (
+                <div style={styles.emptyState}>
+                    <p>Δεν υπάρχουν εκδρομές</p>
+                </div>
+            ) : (
+                <div style={styles.grid}>
+                    {filteredTrips.map(trip => (
+                        <div key={trip._id} style={styles.card}>
+                            <div style={styles.cardHeader}>
+                                <h3 style={styles.cardTitle}>{trip.name}</h3>
+                                <div style={styles.badge}>
+                                    {trip.participants?.length || 0} άτομα
+                                </div>
+                            </div>
+
+                            <div style={styles.cardBody}>
+                                <p style={styles.date}>
+                                    📅 {formatDate(trip.date)}
+                                </p>
+                                <p style={styles.locations}>
+                                    📍 {trip.locations.join(', ')}
+                                </p>
+                            </div>
+
+                            <div style={styles.cardActions}>
+                                <button
+                                    onClick={() => handleGeneratePDF(trip)}
+                                    style={styles.pdfBtn}
+                                    title="Εξαγωγή σε PDF"
+                                >
+                                    📄 PDF
+                                </button>
+
+                                {type === 'upcoming' && (
+                                    <>
+                                        <button
+                                            onClick={() => onManageParticipants(trip)}
+                                            style={styles.manageBtn}
+                                            title="Διαχείριση Παρουσιών & Σημειώσεων"
+                                        >
+                                            ✓ Συμμετέχοντες
+                                        </button>
+                                        <button
+                                            onClick={() => onEdit(trip)}
+                                            style={styles.editBtn}
+                                        >
+                                            ✏️ Επεξεργασία
+                                        </button>
+                                    </>
+                                )}
+
+                                <button
+                                    onClick={() => setShowDeleteConfirm(trip._id)}
+                                    style={styles.deleteBtn}
+                                >
+                                    🗑️ Διαγραφή
+                                </button>
+                            </div>
+
+                            {showDeleteConfirm === trip._id && (
+                                <div style={styles.confirmDialog}>
+                                    <p>Σίγουρα θέλετε να διαγράψετε αυτή την εκδρομή;</p>
+                                    <div style={styles.confirmActions}>
+                                        <button
+                                            onClick={() => handleDelete(trip._id)}
+                                            style={styles.confirmYes}
+                                        >
+                                            Ναι
+                                        </button>
+                                        <button
+                                            onClick={() => setShowDeleteConfirm(null)}
+                                            style={styles.confirmNo}
+                                        >
+                                            Όχι
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
 
 const styles = {
-    container: {
-        minHeight: '100vh',
-        backgroundColor: '#f5f7fa',
-        padding: '20px'
-    },
-    header: {
+    searchBar: {
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: 'white',
-        padding: '20px 30px',
-        borderRadius: '12px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        gap: '10px',
         marginBottom: '20px',
         flexWrap: 'wrap',
-        gap: '15px'
-    },
-    title: {
-        margin: 0,
-        color: '#667eea',
-        fontSize: '28px'
-    },
-    headerRight: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '15px'
-    },
-    username: {
-        color: '#555',
-        fontSize: '16px'
-    },
-    logoutBtn: {
-        padding: '10px 20px',
-        backgroundColor: '#e03131',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontSize: '14px',
-        fontWeight: '500'
-    },
-    actions: {
-        display: 'flex',
-        gap: '15px',
-        marginBottom: '20px',
-        flexWrap: 'wrap'
-    },
-    backBtn: {
-        padding: '12px 24px',
-        backgroundColor: '#95a5a6',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontSize: '15px',
-        fontWeight: '500'
-    },
-    addBtn: {
-        padding: '12px 24px',
-        backgroundColor: '#51cf66',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontSize: '15px',
-        fontWeight: '500'
-    },
-    importBtn: {
-        padding: '12px 24px',
-        backgroundColor: '#339af0',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontSize: '15px',
-        fontWeight: '500',
-        display: 'inline-block'
-    },
-    formContainer: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '25px',
-        marginBottom: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-    },
-    formTitle: {
-        margin: '0 0 20px 0',
-        color: '#333',
-        fontSize: '20px'
-    },
-    form: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px'
-    },
-    formRow: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '15px'
-    },
-    inputGroup: {
-        display: 'flex',
-        flexDirection: 'column'
-    },
-    label: {
-        marginBottom: '6px',
-        color: '#555',
-        fontWeight: '500',
-        fontSize: '14px'
-    },
-    input: {
-        padding: '10px',
-        border: '2px solid #e0e0e0',
-        borderRadius: '6px',
-        fontSize: '15px'
-    },
-    error: {
-        backgroundColor: '#fee',
-        color: '#c33',
-        padding: '12px',
-        borderRadius: '8px',
-        textAlign: 'center'
-    },
-    formActions: {
-        display: 'flex',
-        gap: '10px'
-    },
-    saveBtn: {
-        padding: '12px 30px',
-        backgroundColor: '#51cf66',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontWeight: '500'
-    },
-    cancelBtn: {
-        padding: '12px 30px',
-        backgroundColor: '#95a5a6',
-        color: 'white',
-        border: 'none',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        fontWeight: '500'
-    },
-    searchContainer: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '15px',
-        flexWrap: 'wrap'
+        padding: '15px',
+        backgroundColor: '#f8f9fa',
+        borderRadius: '10px'
     },
     searchInput: {
-        flex: 1,
-        minWidth: '250px',
-        padding: '12px',
+        flex: '2',
+        padding: '10px',
         border: '2px solid #e0e0e0',
         borderRadius: '8px',
-        fontSize: '15px'
+        fontSize: '14px',
+        minWidth: '200px'
     },
-    contactCount: {
-        color: '#667eea',
-        fontWeight: 'bold',
-        fontSize: '16px'
+    dateInputWrapper: {
+        position: 'relative',
+        flex: '1',
+        minWidth: '150px'
     },
-    tableContainer: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        overflowX: 'auto'
-    },
-    table: {
+    dateInputWithIcon: {
         width: '100%',
-        borderCollapse: 'collapse'
+        padding: '10px',
+        paddingRight: '35px',
+        border: '2px solid #e0e0e0',
+        borderRadius: '8px',
+        fontSize: '14px',
+        cursor: 'pointer',
+        boxSizing: 'border-box'
     },
-    th: {
-        textAlign: 'left',
-        padding: '15px',
-        borderBottom: '2px solid #e0e0e0',
-        color: '#555',
-        fontWeight: 'bold',
-        fontSize: '15px'
+    calendarIcon: {
+        position: 'absolute',
+        right: '10px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        fontSize: '18px',
+        pointerEvents: 'none',
+        color: '#667eea'
     },
-    tr: {
-        borderBottom: '1px solid #f0f0f0'
+    dateInput: {
+        flex: '1',
+        padding: '10px',
+        border: '2px solid #e0e0e0',
+        borderRadius: '8px',
+        fontSize: '14px',
+        minWidth: '150px'
     },
-    td: {
-        padding: '15px',
-        color: '#333',
-        fontSize: '15px'
+    searchBtn: {
+        padding: '10px 20px',
+        backgroundColor: '#667eea',
+        color: 'white',
+        border: 'none',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        fontWeight: '500'
+    },
+    resetBtn: {
+        padding: '10px 20px',
+        backgroundColor: '#95a5a6',
+        color: 'white',
+        border: 'none',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        fontWeight: '500'
     },
     emptyState: {
         textAlign: 'center',
@@ -484,50 +256,133 @@ const styles = {
         color: '#999',
         fontSize: '18px'
     },
-    editBtnSmall: {
-        padding: '6px 12px',
-        backgroundColor: '#4c6ef5',
-        color: 'white',
-        border: 'none',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        marginRight: '8px',
-        fontSize: '14px'
+    grid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+        gap: '20px'
     },
-    deleteBtnSmall: {
-        padding: '6px 12px',
-        backgroundColor: '#e03131',
-        color: 'white',
-        border: 'none',
-        borderRadius: '6px',
-        cursor: 'pointer',
-        fontSize: '14px'
+    card: {
+        backgroundColor: '#fff',
+        border: '2px solid #e9ecef',
+        borderRadius: '12px',
+        padding: '20px',
+        transition: 'transform 0.2s, box-shadow 0.2s',
+        position: 'relative'
     },
-    confirmInline: {
+    cardHeader: {
         display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
+        justifyContent: 'space-between',
+        alignItems: 'start',
+        marginBottom: '15px'
     },
-    confirmYes: {
-        padding: '6px 16px',
-        backgroundColor: '#e03131',
+    cardTitle: {
+        margin: 0,
+        color: '#333',
+        fontSize: '20px',
+        fontWeight: 'bold'
+    },
+    badge: {
+        backgroundColor: '#51cf66',
         color: 'white',
-        border: 'none',
-        borderRadius: '6px',
-        cursor: 'pointer',
+        padding: '6px 12px',
+        borderRadius: '20px',
         fontSize: '13px',
         fontWeight: 'bold'
     },
-    confirmNo: {
-        padding: '6px 16px',
+    cardBody: {
+        marginBottom: '15px'
+    },
+    date: {
+        color: '#555',
+        fontSize: '15px',
+        marginBottom: '8px'
+    },
+    locations: {
+        color: '#777',
+        fontSize: '14px'
+    },
+    cardActions: {
+        display: 'flex',
+        gap: '8px',
+        flexWrap: 'wrap'
+    },
+    manageBtn: {
+        padding: '8px 16px',
         backgroundColor: '#51cf66',
         color: 'white',
         border: 'none',
         borderRadius: '6px',
         cursor: 'pointer',
         fontSize: '13px',
+        fontWeight: '500'
+    },
+    pdfBtn: {
+        padding: '8px 16px',
+        backgroundColor: '#339af0',
+        color: 'white',
+        border: 'none',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: '500'
+    },
+    editBtn: {
+        padding: '8px 16px',
+        backgroundColor: '#4c6ef5',
+        color: 'white',
+        border: 'none',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: '500'
+    },
+    deleteBtn: {
+        padding: '8px 16px',
+        backgroundColor: '#e03131',
+        color: 'white',
+        border: 'none',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '13px',
+        fontWeight: '500'
+    },
+    confirmDialog: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        borderRadius: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '20px'
+    },
+    confirmActions: {
+        display: 'flex',
+        gap: '10px',
+        marginTop: '15px'
+    },
+    confirmYes: {
+        padding: '10px 24px',
+        backgroundColor: '#ff6b6b',
+        color: 'white',
+        border: 'none',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        fontWeight: 'bold'
+    },
+    confirmNo: {
+        padding: '10px 24px',
+        backgroundColor: '#51cf66',
+        color: 'white',
+        border: 'none',
+        borderRadius: '8px',
+        cursor: 'pointer',
         fontWeight: 'bold'
     }
 };
 
-export default ContactsManager;
+export default TripList;

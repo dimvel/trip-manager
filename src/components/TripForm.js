@@ -9,6 +9,9 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
     const [participants, setParticipants] = useState([]);
     const [allContacts, setAllContacts] = useState([]);
     const [error, setError] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const contactsPerPage = 10;
+    const maxContacts = 1000;
 
     useEffect(() => {
         loadContacts();
@@ -69,6 +72,39 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
         }
     };
 
+    // Pagination logic
+    const displayedContacts = allContacts.slice(0, maxContacts);
+
+    const totalPages = Math.ceil(displayedContacts.length / contactsPerPage);
+
+    const paginatedContacts = displayedContacts.slice(
+        (currentPage - 1) * contactsPerPage,
+        currentPage * contactsPerPage
+    );
+
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // Generate page numbers to display (show max 10 page buttons)
+    const getPageNumbers = () => {
+        const maxPageButtons = 10;
+        if (totalPages <= maxPageButtons) {
+            return [...Array(totalPages)].map((_, i) => i + 1);
+        }
+
+        const halfButtons = Math.floor(maxPageButtons / 2);
+        let startPage = Math.max(1, currentPage - halfButtons);
+        let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+
+        if (endPage - startPage < maxPageButtons - 1) {
+            startPage = Math.max(1, endPage - maxPageButtons + 1);
+        }
+
+        return [...Array(endPage - startPage + 1)].map((_, i) => startPage + i);
+    };
+
     return (
         <div style={styles.container}>
             <header style={styles.header}>
@@ -101,12 +137,16 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
 
                         <div style={styles.inputGroup}>
                             <label style={styles.label}>Ημερομηνία *</label>
-                            <input
-                                type="date"
-                                value={date}
-                                onChange={(e) => setDate(e.target.value)}
-                                style={styles.input}
-                            />
+                            <div style={styles.dateInputWrapper}>
+                                <input
+                                    type="date"
+                                    value={date}
+                                    onChange={(e) => setDate(e.target.value)}
+                                    style={styles.dateInput}
+                                    onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                                />
+                                <span style={styles.calendarIcon}>📅</span>
+                            </div>
                         </div>
 
                         <div style={styles.inputGroup}>
@@ -131,30 +171,107 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
                                 Δεν υπάρχουν διαθέσιμες επαφές. Προσθέστε επαφές πρώτα από τη Διαχείριση Επαφών.
                             </p>
                         ) : (
-                            <div style={styles.contactsGrid}>
-                                {allContacts.map(contact => (
-                                    <div
-                                        key={contact._id}
-                                        onClick={() => toggleParticipant(contact._id)}
-                                        style={{
-                                            ...styles.contactCard,
-                                            ...(participants.includes(contact._id) ? styles.selectedContact : {})
-                                        }}
-                                    >
-                                        <div style={styles.checkbox}>
-                                            {participants.includes(contact._id) ? '✓' : ''}
-                                        </div>
-                                        <div>
-                                            <div style={styles.contactName}>
-                                                {contact.firstName} {contact.lastName}
-                                            </div>
-                                            {contact.phone && (
-                                                <div style={styles.contactPhone}>{contact.phone}</div>
-                                            )}
-                                        </div>
+                            <>
+                                {allContacts.length > maxContacts && (
+                                    <div style={styles.limitWarning}>
+                                        ⚠️ Εμφανίζονται οι πρώτες {maxContacts} επαφές από {allContacts.length} συνολικά
                                     </div>
-                                ))}
-                            </div>
+                                )}
+
+                                <div style={styles.contactsGrid}>
+                                    {paginatedContacts.map(contact => (
+                                        <div
+                                            key={contact._id}
+                                            onClick={() => toggleParticipant(contact._id)}
+                                            style={{
+                                                ...styles.contactCard,
+                                                ...(participants.includes(contact._id) ? styles.selectedContact : {})
+                                            }}
+                                        >
+                                            <div style={styles.checkbox}>
+                                                {participants.includes(contact._id) ? '✓' : ''}
+                                            </div>
+                                            <div>
+                                                <div style={styles.contactName}>
+                                                    {contact.firstName} {contact.lastName}
+                                                </div>
+                                                {contact.phone && (
+                                                    <div style={styles.contactPhone}>{contact.phone}</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {totalPages > 1 && (
+                                    <div style={styles.pagination}>
+                                        <button
+                                            onClick={() => handlePageChange(1)}
+                                            disabled={currentPage === 1}
+                                            style={{
+                                                ...styles.pageBtn,
+                                                ...(currentPage === 1 ? styles.pageBtnDisabled : {})
+                                            }}
+                                        >
+                                            ⏮️ Πρώτη
+                                        </button>
+
+                                        <button
+                                            onClick={() => handlePageChange(currentPage - 1)}
+                                            disabled={currentPage === 1}
+                                            style={{
+                                                ...styles.pageBtn,
+                                                ...(currentPage === 1 ? styles.pageBtnDisabled : {})
+                                            }}
+                                        >
+                                            ← Προηγούμενη
+                                        </button>
+
+                                        <div style={styles.pageNumbers}>
+                                            {getPageNumbers().map(pageNum => (
+                                                <button
+                                                    key={pageNum}
+                                                    onClick={() => handlePageChange(pageNum)}
+                                                    style={{
+                                                        ...styles.pageNumber,
+                                                        ...(currentPage === pageNum ? styles.pageNumberActive : {})
+                                                    }}
+                                                >
+                                                    {pageNum}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            onClick={() => handlePageChange(currentPage + 1)}
+                                            disabled={currentPage === totalPages}
+                                            style={{
+                                                ...styles.pageBtn,
+                                                ...(currentPage === totalPages ? styles.pageBtnDisabled : {})
+                                            }}
+                                        >
+                                            Επόμενη →
+                                        </button>
+
+                                        <button
+                                            onClick={() => handlePageChange(totalPages)}
+                                            disabled={currentPage === totalPages}
+                                            style={{
+                                                ...styles.pageBtn,
+                                                ...(currentPage === totalPages ? styles.pageBtnDisabled : {})
+                                            }}
+                                        >
+                                            Τελευταία ⏭️
+                                        </button>
+                                    </div>
+                                )}
+
+                                <div style={styles.pageInfo}>
+                                    Σελίδα {currentPage} από {totalPages} •
+                                    Εμφάνιση {((currentPage - 1) * contactsPerPage) + 1}-{Math.min(currentPage * contactsPerPage, displayedContacts.length)} από {displayedContacts.length} επαφές
+                                    {participants.length > 0 && ` • ${participants.length} επιλεγμένοι`}
+                                </div>
+                            </>
                         )}
                     </div>
 
@@ -257,6 +374,28 @@ const styles = {
         fontSize: '15px',
         boxSizing: 'border-box'
     },
+    dateInputWrapper: {
+        position: 'relative',
+        width: '100%'
+    },
+    dateInput: {
+        width: '100%',
+        padding: '12px',
+        paddingRight: '40px',
+        border: '2px solid #e0e0e0',
+        borderRadius: '8px',
+        fontSize: '15px',
+        boxSizing: 'border-box',
+        cursor: 'pointer'
+    },
+    calendarIcon: {
+        position: 'absolute',
+        right: '12px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        fontSize: '20px',
+        pointerEvents: 'none'
+    },
     noContacts: {
         padding: '30px',
         textAlign: 'center',
@@ -267,7 +406,8 @@ const styles = {
     contactsGrid: {
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-        gap: '12px'
+        gap: '12px',
+        marginBottom: '20px'
     },
     contactCard: {
         display: 'flex',
@@ -341,6 +481,63 @@ const styles = {
         cursor: 'pointer',
         fontSize: '16px',
         fontWeight: 'bold'
+    },
+    limitWarning: {
+        backgroundColor: '#fff3cd',
+        color: '#856404',
+        padding: '12px',
+        borderRadius: '8px',
+        marginBottom: '15px',
+        fontSize: '14px',
+        textAlign: 'center'
+    },
+    pagination: {
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: '20px',
+        marginBottom: '15px',
+        gap: '10px',
+        flexWrap: 'wrap'
+    },
+    pageBtn: {
+        padding: '10px 20px',
+        backgroundColor: '#667eea',
+        color: 'white',
+        border: 'none',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: '500'
+    },
+    pageBtnDisabled: {
+        backgroundColor: '#ccc',
+        cursor: 'not-allowed'
+    },
+    pageNumbers: {
+        display: 'flex',
+        gap: '5px',
+        flexWrap: 'wrap'
+    },
+    pageNumber: {
+        padding: '8px 12px',
+        backgroundColor: 'white',
+        color: '#667eea',
+        border: '2px solid #667eea',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: '500'
+    },
+    pageNumberActive: {
+        backgroundColor: '#667eea',
+        color: 'white'
+    },
+    pageInfo: {
+        textAlign: 'center',
+        color: '#777',
+        fontSize: '14px',
+        marginTop: '10px'
     }
 };
 

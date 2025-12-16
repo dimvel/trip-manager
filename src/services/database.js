@@ -7,8 +7,50 @@ import PouchDBFind from 'pouchdb-find';
 PouchDB.plugin(PouchDBFind);
 
 // Initialize databases
+const usersDB = new PouchDB('users');
 const tripsDB = new PouchDB('trips');
 const contactsDB = new PouchDB('contacts');
+
+// ============================================
+// USER AUTHENTICATION
+// ============================================
+
+export const initializeDefaultUsers = async () => {
+    try {
+        const existingUsers = await usersDB.allDocs();
+        if (existingUsers.total_rows === 0) {
+            await usersDB.bulkDocs([
+                {
+                    _id: 'user_admin',
+                    username: 'admin',
+                    password: 'admin123',
+                    role: 'admin'
+                },
+                {
+                    _id: 'user_guest',
+                    username: 'guest',
+                    password: 'guest123',
+                    role: 'user'
+                }
+            ]);
+            console.log('Default users created');
+        }
+    } catch (error) {
+        console.error('Error initializing users:', error);
+    }
+};
+
+export const authenticateUser = async (username, password) => {
+    try {
+        const result = await usersDB.find({
+            selector: { username, password }
+        });
+        return result.docs.length > 0 ? result.docs[0] : null;
+    } catch (error) {
+        console.error('Authentication error:', error);
+        return null;
+    }
+};
 
 // ============================================
 // CONTACTS CRUD
@@ -16,6 +58,18 @@ const contactsDB = new PouchDB('contacts');
 
 export const addContact = async (contact) => {
     try {
+        // Check for duplicates
+        const existingContacts = await getAllContacts();
+        const duplicate = existingContacts.find(c =>
+            c.firstName.toLowerCase().trim() === contact.firstName.toLowerCase().trim() &&
+            c.lastName.toLowerCase().trim() === contact.lastName.toLowerCase().trim() &&
+            (c.phone || '').trim() === (contact.phone || '').trim()
+        );
+
+        if (duplicate) {
+            throw new Error('Η επαφή υπάρχει ήδη με το ίδιο όνομα, επώνυμο και τηλέφωνο');
+        }
+
         const doc = {
             _id: `contact_${Date.now()}`,
             ...contact,
@@ -40,6 +94,19 @@ export const getAllContacts = async () => {
 
 export const updateContact = async (contact) => {
     try {
+        // Check for duplicates (excluding current contact)
+        const existingContacts = await getAllContacts();
+        const duplicate = existingContacts.find(c =>
+            c._id !== contact._id &&
+            c.firstName.toLowerCase().trim() === contact.firstName.toLowerCase().trim() &&
+            c.lastName.toLowerCase().trim() === contact.lastName.toLowerCase().trim() &&
+            (c.phone || '').trim() === (contact.phone || '').trim()
+        );
+
+        if (duplicate) {
+            throw new Error('Υπάρχει ήδη άλλη επαφή με το ίδιο όνομα, επώνυμο και τηλέφωνο');
+        }
+
         return await contactsDB.put(contact);
     } catch (error) {
         console.error('Error updating contact:', error);
@@ -79,6 +146,17 @@ export const importContactsFromCSV = async (contacts) => {
 
 export const addTrip = async (trip) => {
     try {
+        // Check for duplicates (same name and date)
+        const existingTrips = await getAllTrips();
+        const duplicate = existingTrips.find(t =>
+            t.name.toLowerCase().trim() === trip.name.toLowerCase().trim() &&
+            t.date === trip.date
+        );
+
+        if (duplicate) {
+            throw new Error('Υπάρχει ήδη εκδρομή με το ίδιο όνομα και ημερομηνία');
+        }
+
         // Convert participants to new format if needed
         const formattedParticipants = trip.participants.map(p => {
             if (typeof p === 'string') {
@@ -141,6 +219,18 @@ export const getArchivedTrips = async () => {
 
 export const updateTrip = async (trip) => {
     try {
+        // Check for duplicates (excluding current trip)
+        const existingTrips = await getAllTrips();
+        const duplicate = existingTrips.find(t =>
+            t._id !== trip._id &&
+            t.name.toLowerCase().trim() === trip.name.toLowerCase().trim() &&
+            t.date === trip.date
+        );
+
+        if (duplicate) {
+            throw new Error('Υπάρχει ήδη άλλη εκδρομή με το ίδιο όνομα και ημερομηνία');
+        }
+
         // Ensure participants are in correct format
         const formattedParticipants = trip.participants.map(p => {
             if (typeof p === 'string') {
@@ -283,4 +373,4 @@ export const searchTrips = async (searchTerm, startDate, endDate) => {
     }
 };
 
-export { tripsDB, contactsDB };
+export { usersDB, tripsDB, contactsDB };
