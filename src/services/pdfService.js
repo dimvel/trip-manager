@@ -91,13 +91,11 @@ const addTripInfo = (doc, trip, participantDetails) => {
     doc.text(`Τοποθεσίες: ${trip.locations.join(', ')}`, 20, 60);
     doc.text(`Συνολικοί Συμμετέχοντες: ${participantDetails.length}`, 20, 70);
 
-    // Add attendance stats if available
-    const checkedCount = participantDetails.filter(p => p.checked).length;
-    const uncheckedCount = participantDetails.length - checkedCount;
+    // Add attendance stats
+    const confirmedCount = participantDetails.filter(p => p.checked).length;
+    const unconfirmedCount = participantDetails.length - confirmedCount;
 
-    if (participantDetails.some(p => typeof p.checked !== 'undefined')) {
-        doc.text(`Παρόντες: ${checkedCount} | Απόντες: ${uncheckedCount}`, 20, 80);
-    }
+    doc.text(`Επιβεβαιωμένοι: ${confirmedCount} | Μη Επιβεβαιωμένοι: ${unconfirmedCount}`, 20, 80);
 };
 
 /**
@@ -111,12 +109,10 @@ const addParticipantsTable = (doc, participantDetails) => {
         return;
     }
 
-    const hasAttendance = participantDetails.some(p => typeof p.checked !== 'undefined');
     const hasNotes = participantDetails.some(p => p.notes && p.notes.trim() !== '');
 
     // Build table headers
-    const headers = ['#', 'Όνομα', 'Επώνυμο', 'Τηλέφωνο'];
-    if (hasAttendance) headers.push('Κατάσταση');
+    const headers = ['#', 'Όνομα', 'Επώνυμο', 'Τηλέφωνο', 'Κατάσταση'];
     if (hasNotes) headers.push('Σημειώσεις');
 
     // Build table data
@@ -125,12 +121,9 @@ const addParticipantsTable = (doc, participantDetails) => {
             idx + 1,
             p.contact.firstName,
             p.contact.lastName,
-            p.contact.phone || 'Μη διαθέσιμο'
+            p.contact.phone || 'Μη διαθέσιμο',
+            p.checked ? 'Επιβεβαιωμένος' : 'Μη Επιβεβαιωμένος'
         ];
-
-        if (hasAttendance) {
-            row.push(p.checked ? 'Παρών' : 'Απών');
-        }
 
         if (hasNotes) {
             row.push(p.notes || '-');
@@ -139,10 +132,8 @@ const addParticipantsTable = (doc, participantDetails) => {
         return row;
     });
 
-    const startY = hasAttendance ? 90 : 80;
-
     doc.autoTable({
-        startY: startY,
+        startY: 90,
         head: [headers],
         body: tableData,
         theme: 'grid',
@@ -158,25 +149,18 @@ const addParticipantsTable = (doc, participantDetails) => {
         },
         columnStyles: {
             0: { halign: 'center', cellWidth: 10 },
-            1: { cellWidth: hasNotes ? 30 : 40 },
-            2: { cellWidth: hasNotes ? 30 : 40 },
-            3: { halign: 'center', cellWidth: hasNotes ? 25 : 35 },
-            ...(hasAttendance && {
-                4: { halign: 'center', cellWidth: 20 }
-            }),
-            ...(hasNotes && {
-                [hasAttendance ? 5 : 4]: { cellWidth: 50 }
-            })
+            1: { cellWidth: hasNotes ? 25 : 35 },
+            2: { cellWidth: hasNotes ? 25 : 35 },
+            3: { halign: 'center', cellWidth: hasNotes ? 25 : 30 },
+            4: { halign: 'center', cellWidth: hasNotes ? 30 : 35 },
+            ...(hasNotes && { 5: { cellWidth: 45 } })
         },
         didParseCell: function(data) {
-            // Color code attendance status
-            if (hasAttendance) {
-                const statusColIndex = 4;
-                if (data.column.index === statusColIndex && data.section === 'body') {
-                    const isPresent = data.cell.raw === 'Παρών';
-                    data.cell.styles.textColor = isPresent ? [81, 207, 102] : [255, 107, 107];
-                    data.cell.styles.fontStyle = 'bold';
-                }
+            // Color code confirmation status
+            if (data.column.index === 4 && data.section === 'body') {
+                const isConfirmed = data.cell.raw === 'Επιβεβαιωμένος';
+                data.cell.styles.textColor = isConfirmed ? [81, 207, 102] : [245, 159, 0];
+                data.cell.styles.fontStyle = 'bold';
             }
         }
     });

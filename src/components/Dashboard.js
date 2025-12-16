@@ -37,34 +37,51 @@ const Dashboard = ({ user, onLogout }) => {
     const handleTripSaved = () => {
         setShowTripForm(false);
         setEditingTrip(null);
+        setShowContacts(false);
+        setShowParticipants(false);
         loadTrips();
     };
 
     const handleEditTrip = (trip) => {
         setEditingTrip(trip);
         setShowTripForm(true);
+        setShowContacts(false);
+        setShowParticipants(false);
     };
 
     const handleNewTrip = () => {
         setEditingTrip(null);
         setShowTripForm(true);
+        setShowContacts(false);
+        setShowParticipants(false);
     };
 
     const handleManageParticipants = (trip) => {
         setManagingTrip(trip);
         setShowParticipants(true);
+        setShowTripForm(false);
+        setShowContacts(false);
     };
 
     const handleParticipantsBack = () => {
         setShowParticipants(false);
         setManagingTrip(null);
+        setShowTripForm(false);
+        setShowContacts(false);
         loadTrips();
+    };
+
+    // Contact manager handlers
+    const handleContactsBack = () => {
+        setShowContacts(false);
+        setShowTripForm(false);
+        setShowParticipants(false);
     };
 
     if (showContacts) {
         return (
             <ContactsManager
-                onBack={() => setShowContacts(false)}
+                onBack={handleContactsBack}
                 user={user}
                 onLogout={onLogout}
             />
