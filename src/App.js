@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import { initializeDefaultUsers } from './services/database';
+import { initializeDefaultUsers } from './services/auth';
 
 function App() {
   const [user, setUser] = useState(null);

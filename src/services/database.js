@@ -1,6 +1,7 @@
 // src/services/database.js
 import PouchDB from 'pouchdb';
 import PouchDBFind from 'pouchdb-find';
+import { usersDB } from './auth';
 
 PouchDB.plugin(PouchDBFind);
 
@@ -8,45 +9,6 @@ PouchDB.plugin(PouchDBFind);
 const usersDB = new PouchDB('users');
 const tripsDB = new PouchDB('trips');
 const contactsDB = new PouchDB('contacts');
-
-// Initialize default users
-export const initializeDefaultUsers = async () => {
-    try {
-        const existingUsers = await usersDB.allDocs();
-        if (existingUsers.total_rows === 0) {
-            await usersDB.bulkDocs([
-                {
-                    _id: 'user_admin',
-                    username: 'admin',
-                    password: 'admin123', // In production, hash this!
-                    role: 'admin'
-                },
-                {
-                    _id: 'user_guest',
-                    username: 'guest',
-                    password: 'guest123',
-                    role: 'user'
-                }
-            ]);
-            console.log('Default users created');
-        }
-    } catch (error) {
-        console.error('Error initializing users:', error);
-    }
-};
-
-// User authentication
-export const authenticateUser = async (username, password) => {
-    try {
-        const result = await usersDB.find({
-            selector: { username, password }
-        });
-        return result.docs.length > 0 ? result.docs[0] : null;
-    } catch (error) {
-        console.error('Authentication error:', error);
-        return null;
-    }
-};
 
 // Contacts CRUD
 export const addContact = async (contact) => {

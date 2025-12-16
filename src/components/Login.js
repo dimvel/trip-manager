@@ -1,6 +1,6 @@
 // src/components/Login.js
 import React, { useState } from 'react';
-import { authenticateUser } from '../services/database';
+import { authenticateUser } from './services/auth';
 
 const Login = ({ onLogin }) => {
     const [username, setUsername] = useState('');
