@@ -1,70 +1,363 @@
-# Getting Started with Create React App
+# 🚀 Trip Manager - Offline Android App
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Πλήρης εφαρμογή διαχείρισης εκδρομών για Android tablets/phones που λειτουργεί **100% offline**.
 
-## Available Scripts
+## 📋 Χαρακτηριστικά
 
-In the project directory, you can run:
+### ✨ Core Features
+- 🔐 **Σύστημα Login/Logout** με προκαθορισμένους χρήστες
+- 📅 **Διαχείριση Εκδρομών:**
+    - Δημιουργία, επεξεργασία, διαγραφή
+    - Αυτόματη αρχειοθέτηση μετά την ημερομηνία
+    - Επερχόμενες & Αρχειοθετημένες εκδρομές
+- 👥 **Κεντρική Λίστα Επαφών:**
+    - CRUD operations (Create, Read, Update, Delete)
+    - Import από CSV/Excel
+    - Επιλογή συμμετεχόντων ανά εκδρομή
+- 🔍 **Αναζήτηση & Φιλτράρισμα:**
+    - Αναζήτηση με κείμενο
+    - Φιλτράρισμα με date range
+- 📄 **Export PDF:**
+    - Αναφορά ανά εκδρομή με συμμετέχοντες
+- 🌐 **100% Offline λειτουργία**
+- 📱 **Responsive Design** (Tablet 10" optimized)
 
-### `npm start`
+### 🎨 UI/UX
+- Ελληνική διεπαφή
+- Σύγχρονο, καθαρό design
+- Χρωματική παλέτα: Μπλε (#667eea), Πράσινο (#51cf66), Πορτοκαλί (#ff922b)
+- Landscape orientation για tablets
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 🏗️ Αρχιτεκτονική
 
-### `npm test`
+### Tech Stack
+```
+┌─────────────────────────────────────┐
+│         React JS 18.x               │
+│   (UI Components & State)           │
+├─────────────────────────────────────┤
+│       Capacitor 5.x                 │
+│   (Native Android Bridge)           │
+├─────────────────────────────────────┤
+│         PouchDB 8.x                 │
+│   (Offline NoSQL Database)          │
+├─────────────────────────────────────┤
+│    jsPDF + Papa Parse               │
+│   (PDF Export + CSV Import)         │
+└─────────────────────────────────────┘
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Δομή Database (PouchDB)
 
-### `npm run build`
+**usersDB:**
+```javascript
+{
+  _id: 'user_admin',
+  username: 'admin',
+  password: 'admin123',  // TODO: Hash in production
+  role: 'admin'
+}
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+**contactsDB:**
+```javascript
+{
+  _id: 'contact_1234567890',
+  firstName: 'Γιάννης',
+  lastName: 'Παπαδόπουλος',
+  phone: '6912345678',
+  createdAt: '2025-01-15T10:30:00.000Z'
+}
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+**tripsDB:**
+```javascript
+{
+  _id: 'trip_1234567890',
+  name: 'Εκδρομή Μετέωρα',
+  date: '2025-02-20',
+  locations: ['Καλαμπάκα', 'Μετέωρα'],
+  participants: ['contact_123', 'contact_456'],
+  status: 'upcoming' | 'archived',
+  createdAt: '2025-01-15T10:30:00.000Z'
+}
+```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Component Hierarchy
+```
+App.js
+├── Login.js
+└── Dashboard.js
+    ├── TripList.js
+    │   └── PDF Export
+    ├── TripForm.js
+    │   └── Contact Selector
+    └── ContactsManager.js
+        └── CSV Import
+```
 
-### `npm run eject`
+---
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 🔄 Data Flow
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Authentication Flow
+```
+User Input → authenticateUser() → PouchDB Query → 
+Set User State → Store in localStorage → Render Dashboard
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Trip Creation Flow
+```
+User Input → Validate → addTrip() → PouchDB.put() → 
+Refresh UI → Navigate to Dashboard
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Auto-Archive Flow
+```
+App Mount → setInterval(1 hour) → autoArchiveTrips() →
+Check all upcoming trips → If date < today-1 → 
+Update status to 'archived' → PouchDB.put()
+```
 
-## Learn More
+### CSV Import Flow
+```
+File Input → Papa Parse → Validate rows →
+Filter valid contacts → bulkDocs() → PouchDB → 
+Refresh UI → Show success message
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+---
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 📁 Project Structure
 
-### Code Splitting
+```
+trip-manager/
+├── android/                 # Capacitor Android project
+│   └── app/
+│       └── src/
+│           └── main/
+│               ├── AndroidManifest.xml
+│               └── res/
+├── src/
+│   ├── components/
+│   │   ├── Login.js         # Authentication
+│   │   ├── Dashboard.js     # Main dashboard
+│   │   ├── TripList.js      # Display trips
+│   │   ├── TripForm.js      # Create/Edit trips
+│   │   └── ContactsManager.js  # Manage contacts
+│   ├── services/
+│   │   └── database.js      # PouchDB operations
+│   ├── App.js               # Root component
+│   ├── index.js             # Entry point
+│   └── index.css            # Global styles
+├── public/
+│   ├── index.html
+│   └── manifest.json
+├── capacitor.config.json    # Capacitor config
+├── package.json             # Dependencies
+└── README.md
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+---
 
-### Analyzing the Bundle Size
+## 🚀 Quick Start
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Prerequisites
+- Node.js 18+
+- WSL Ubuntu (για Windows)
+- Android Studio (για APK build)
 
-### Making a Progressive Web App
+### Installation
+```bash
+# 1. Clone/Create project
+npx create-react-app trip-manager
+cd trip-manager
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+# 2. Install dependencies
+npm install pouchdb pouchdb-find react-router-dom
+npm install jspdf jspdf-autotable papaparse
+npm install @capacitor/core @capacitor/cli @capacitor/android
 
-### Advanced Configuration
+# 3. Copy source files (provided in artifacts)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+# 4. Initialize Capacitor
+npx cap init "Trip Manager" "com.tripmanager.app" --web-dir=build
+npx cap add android
 
-### Deployment
+# 5. Run locally
+npm start  # Opens http://localhost:3000
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+### Build APK
+```bash
+# 1. Build React app
+npm run build
 
-### `npm run build` fails to minify
+# 2. Sync with Capacitor
+npx cap sync android
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+# 3. Open in Android Studio
+npx cap open android
+
+# 4. In Android Studio:
+#    - Select Build → Generate Signed Bundle/APK
+#    - Choose APK → Create keystore → Build
+```
+
+---
+
+## 🔐 Default Users
+
+```
+Username: admin
+Password: admin123
+
+Username: guest
+Password: guest123
+```
+
+⚠️ **ΠΡΟΣΟΧΗ:** Σε production, αλλάξτε τους κωδικούς και προσθέστε hashing!
+
+---
+
+## 📊 Database Operations
+
+### Key Functions
+
+**Authentication:**
+```javascript
+authenticateUser(username, password)
+```
+
+**Contacts:**
+```javascript
+addContact(contact)
+getAllContacts()
+updateContact(contact)
+deleteContact(contactId)
+importContactsFromCSV(contacts)
+```
+
+**Trips:**
+```javascript
+addTrip(trip)
+getAllTrips()
+getUpcomingTrips()
+getArchivedTrips()
+updateTrip(trip)
+deleteTrip(tripId)
+searchTrips(searchTerm, startDate, endDate)
+autoArchiveTrips()
+```
+
+---
+
+## 🎯 Features Roadmap
+
+### ✅ Implemented
+- [x] Login/Logout system
+- [x] CRUD operations για trips
+- [x] CRUD operations για contacts
+- [x] Auto-archive trips
+- [x] Search & filter
+- [x] CSV import
+- [x] PDF export
+- [x] Offline functionality
+- [x] Responsive design
+
+### 🔜 Future Enhancements
+- [ ] Password hashing (bcrypt)
+- [ ] User management (add/remove users)
+- [ ] Trip categories/tags
+- [ ] Statistics & analytics
+- [ ] Dark mode
+- [ ] Multi-language support
+- [ ] Backup/restore functionality
+- [ ] Cloud sync option (optional)
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**1. PouchDB not persisting data**
+```javascript
+// Check browser support
+if (!window.indexedDB) {
+  console.error('IndexedDB not supported');
+}
+```
+
+**2. Capacitor build fails**
+```bash
+cd android
+./gradlew clean
+./gradlew build
+```
+
+**3. APK won't install**
+- Enable "Unknown Sources" on device
+- Check Android version compatibility (min SDK 22)
+- Verify APK signature
+
+**4. CSV import fails**
+- Ensure headers: firstName, lastName, phone
+- OR Greek headers: Όνομα, Επώνυμο, Τηλέφωνο
+- Check CSV encoding (UTF-8)
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+## 👨‍💻 Development
+
+### Run Development Server
+```bash
+npm start
+```
+
+### Build Production
+```bash
+npm run build
+```
+
+### Test on Android
+```bash
+npm run android
+```
+
+### View Logs
+```bash
+adb logcat | grep -i "TripManager"
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Open Pull Request
+
+---
+
+## 📞 Support
+
+For issues or questions:
+- Check documentation
+- Review troubleshooting section
+- Open GitHub issue
+
+---
+
+**Developed with ❤️ for offline trip management**
