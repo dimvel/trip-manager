@@ -1,18 +1,23 @@
 // src/components/TripForm.js
 import React, { useState, useEffect } from 'react';
 import { addTrip, updateTrip, getAllContacts } from '../services/database';
+import ParticipantManager from './ParticipantManager';
 
-const TripForm = ({ trip, onSave, onCancel, onManageParticipants, user, onLogout }) => {
+const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
   // --- Form State ---
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [locations, setLocations] = useState('');
   const [error, setError] = useState('');
 
-  // --- Contacts & Participants State ---
-  const [allContacts, setAllContacts] = useState([]);
-  const [confirmedParticipants, setConfirmedParticipants] = useState([]);
+  // --- Participants State (ΠΡΟΣΩΡΙΝΟ - δεν αποθηκεύεται στη βάση μέχρι το submit) ---
   const [participants, setParticipants] = useState([]);
+
+  // --- View State ---
+  const [showParticipantManager, setShowParticipantManager] = useState(false);
+
+  // --- Contacts State ---
+  const [allContacts, setAllContacts] = useState([]);
 
   // Load all contacts from DB on mount
   const loadContacts = async () => {
@@ -24,18 +29,6 @@ const TripForm = ({ trip, onSave, onCancel, onManageParticipants, user, onLogout
     }
   };
 
-  // Helper to extract participant IDs from trip object
-  const getConfirmedParticipants = (currentTrip) => {
-    if (!currentTrip || !currentTrip.participants) return [];
-
-    return currentTrip.participants
-        .filter(p => {
-          if (typeof p === 'object') return p.checked === true;
-          return true;
-        })
-        .map(p => typeof p === 'string' ? p : p.contactId);
-  };
-
   useEffect(() => {
     loadContacts();
 
@@ -43,12 +36,25 @@ const TripForm = ({ trip, onSave, onCancel, onManageParticipants, user, onLogout
       setName(trip.name || '');
       setDate(trip.date || '');
       setLocations(trip.locations ? trip.locations.join(', ') : '');
-      const confirmed = getConfirmedParticipants(trip);
-      setConfirmedParticipants(confirmed);
       setParticipants(trip.participants || []);
     }
   }, [trip]);
 
+  // Get confirmed participants count
+  const getConfirmedParticipants = () => {
+    if (!participants) return [];
+
+    return participants
+        .filter(p => {
+          if (typeof p === 'object') return p.checked === true;
+          return true;
+        })
+        .map(p => typeof p === 'string' ? p : p.contactId);
+  };
+
+  const confirmedParticipants = getConfirmedParticipants();
+
+  // Handle form submission (αποθήκευση στη βάση)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -69,7 +75,7 @@ const TripForm = ({ trip, onSave, onCancel, onManageParticipants, user, onLogout
       name,
       date,
       locations: locationArray,
-      participants: participants, // Uses the state variable now
+      participants: participants, // Χρησιμοποιεί το state που ενημερώθηκε από τον ParticipantManager
       status: 'upcoming'
     };
 
@@ -85,6 +91,31 @@ const TripForm = ({ trip, onSave, onCancel, onManageParticipants, user, onLogout
     }
   };
 
+  // Handle opening participant manager
+  const handleOpenParticipantManager = () => {
+    setShowParticipantManager(true);
+  };
+
+  // Handle saving from participant manager (ΔΕΝ αποθηκεύει στη βάση, μόνο ενημερώνει το state)
+  const handleParticipantsSave = (updatedParticipants) => {
+    setParticipants(updatedParticipants);
+    setShowParticipantManager(false);
+  };
+
+  // Αν είμαστε στον ParticipantManager, εμφάνισέ τον
+  if (showParticipantManager) {
+    return (
+        <ParticipantManager
+            tripName={name || 'Νέα Εκδρομή'}
+            participants={participants}
+            onSave={handleParticipantsSave}
+            user={user}
+            onLogout={onLogout}
+        />
+    );
+  }
+
+  // Αλλιώς εμφάνισε το form
   return (
       <div style={styles.container}>
         <header style={styles.header}>
@@ -148,16 +179,16 @@ const TripForm = ({ trip, onSave, onCancel, onManageParticipants, user, onLogout
                 </h2>
                 <button
                     type="button"
-                    onClick={() => onManageParticipants(trip || { name, date, locations: locations.split(',').map(l => l.trim()), participants: [] })}
+                    onClick={handleOpenParticipantManager}
                     style={styles.manageParticipantsBtn}
                 >
-                  {trip ? '✏️ Επεξεργασία Συμμετεχόντων' : '+ Προσθήκη Συμμετεχόντων'}
+                  {participants.length > 0 ? '✏️ Επεξεργασία Συμμετεχόντων' : '+ Προσθήκη Συμμετεχόντων'}
                 </button>
               </div>
 
               {confirmedParticipants.length === 0 ? (
                   <p style={styles.noParticipants}>
-                    Δεν υπάρχουν συμμετέχοντες. Πατήστε "{trip ? 'Επεξεργασία' : 'Προσθήκη'} Συμμετεχόντων" για να προσθέσετε.
+                    Δεν υπάρχουν συμμετέχοντες. Πατήστε "Προσθήκη Συμμετεχόντων" για να προσθέσετε.
                   </p>
               ) : (
                   <div style={styles.participantsList}>

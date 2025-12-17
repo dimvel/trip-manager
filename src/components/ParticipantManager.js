@@ -1,20 +1,20 @@
 // src/components/ParticipantManager.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAllContacts, updateTrip } from '../services/database';
+import { getAllContacts } from '../services/database';
 
-const ParticipantManager = ({ trip, onBack, onUpdate }) => {
-  const [participants, setParticipants] = useState([]);
-  const [saving, setSaving] = useState(false);
+const ParticipantManager = ({ tripName, participants, onSave, user, onLogout }) => {
+  const [participantList, setParticipantList] = useState([]);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
       const contacts = await getAllContacts();
       const safeContacts = contacts || [];
 
-      // Build participant map from trip safely
+      // Build participant map από το prop participants
       const participantMap = {};
-      if (trip?.participants && Array.isArray(trip.participants)) {
-        trip.participants.forEach(p => {
+      if (participants && Array.isArray(participants)) {
+        participants.forEach(p => {
           const contactId = typeof p === 'string' ? p : p.contactId;
           const checked = typeof p === 'object' ? p.checked : true;
           const notes = typeof p === 'object' ? (p.notes || '') : '';
@@ -25,8 +25,8 @@ const ParticipantManager = ({ trip, onBack, onUpdate }) => {
         });
       }
 
-      // Build full list with ALL contacts, matching by any available ID
-      const participantList = safeContacts.map(contact => {
+      // Build full list με ΟΛΟΥΣ τους contacts
+      const pList = safeContacts.map(contact => {
         const cId = contact._id || contact.id;
         const existingData = participantMap[cId];
 
@@ -39,78 +39,68 @@ const ParticipantManager = ({ trip, onBack, onUpdate }) => {
         };
       });
 
-      setParticipants(participantList);
+      setParticipantList(pList);
     } catch (error) {
       console.error("Σφάλμα κατά τη φόρτωση δεδομένων:", error);
     }
-  }, [trip]);
+  }, [participants]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   const handleCheckToggle = (contactId) => {
-    setParticipants(prev => prev.map(p =>
+    setParticipantList(prev => prev.map(p =>
         p.contactId === contactId ? { ...p, checked: !p.checked } : p
     ));
   };
 
   const handleNotesChange = (contactId, notes) => {
     const limitedNotes = notes.substring(0, 500);
-    setParticipants(prev => prev.map(p =>
+    setParticipantList(prev => prev.map(p =>
         p.contactId === contactId ? { ...p, notes: limitedNotes } : p
     ));
   };
 
-  const handleSave = async () => {
-    if (!trip) return;
-    setSaving(true);
-
-    try {
-      // Format back to DB structure - keeping only essential info
-      const updatedParticipants = participants.map(p => ({
-        contactId: p.contactId,
-        checked: p.checked,
-        notes: p.notes
-      }));
-
-      const updatedTrip = {
-        ...trip,
-        participants: updatedParticipants
-      };
-
-      await updateTrip(updatedTrip);
-      alert('Οι αλλαγές αποθηκεύτηκαν επιτυχώς!');
-      onUpdate(); // Ενημέρωση του parent state
-      onBack();   // Επιστροφή στην προηγούμενη οθόνη
-    } catch (error) {
-      console.error("Save error:", error);
-      alert('Σφάλμα κατά την αποθήκευση');
-    } finally {
-      setSaving(false);
-    }
+  // Όταν πατηθεί το κουμπί Αποθήκευση, εμφάνισε το confirmation dialog
+  const handleSaveClick = () => {
+    setShowConfirmDialog(true);
   };
 
-  const checkedCount = participants.filter(p => p.checked).length;
-  const totalCount = participants.length;
+  // Αν ο χρήστης επιβεβαιώσει, επέστρεψε τα δεδομένα στο TripForm
+  const handleConfirmSave = () => {
+    // Format back to DB structure
+    const updatedParticipants = participantList.map(p => ({
+      contactId: p.contactId,
+      checked: p.checked,
+      notes: p.notes
+    }));
+
+    onSave(updatedParticipants); // Καλεί το callback που θα ενημερώσει το state στο TripForm
+    setShowConfirmDialog(false);
+  };
+
+  // Αν ακυρώσει, κλείσε το dialog και συνέχισε την επεξεργασία
+  const handleCancelSave = () => {
+    setShowConfirmDialog(false);
+  };
+
+  const checkedCount = participantList.filter(p => p.checked).length;
+  const totalCount = participantList.length;
 
   return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <button onClick={onBack} style={styles.backBtn}>
-            ← Πίσω
-          </button>
           <div style={styles.headerCenter}>
             <h2 style={styles.title}>Διαχείριση Συμμετεχόντων</h2>
-            <p style={styles.tripName}>{trip?.name || 'Φόρτωση...'}</p>
+            <p style={styles.tripName}>{tripName}</p>
           </div>
-          <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{ ...styles.saveBtn, ...(saving ? styles.savingBtn : {}) }}
-          >
-            {saving ? 'Αποθήκευση...' : '💾 Αποθήκευση'}
-          </button>
+          <div style={styles.headerRight}>
+            <span style={styles.username}>{user?.username}</span>
+            <button onClick={onLogout} style={styles.logoutBtn}>
+              Αποσύνδεση
+            </button>
+          </div>
         </div>
 
         <div style={styles.stats}>
@@ -128,8 +118,14 @@ const ParticipantManager = ({ trip, onBack, onUpdate }) => {
           </div>
         </div>
 
+        <div style={styles.saveButtonContainer}>
+          <button onClick={handleSaveClick} style={styles.saveBtn}>
+            💾 Αποθήκευση
+          </button>
+        </div>
+
         <div style={styles.participantList}>
-          {participants.map((participant, index) => (
+          {participantList.map((participant, index) => (
               <div key={participant.contactId || index} style={styles.participantCard}>
                 <div style={styles.participantHeader}>
                   <div style={styles.checkboxContainer}>
@@ -174,25 +170,49 @@ const ParticipantManager = ({ trip, onBack, onUpdate }) => {
           ))}
         </div>
 
-        {participants.length === 0 && (
+        {participantList.length === 0 && (
             <div style={styles.emptyState}>
               <p>Δεν βρέθηκαν επαφές στη βάση δεδομένων.</p>
+            </div>
+        )}
+
+        {/* Confirmation Dialog */}
+        {showConfirmDialog && (
+            <div style={styles.modalOverlay} onClick={handleCancelSave}>
+              <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                <h3 style={styles.modalTitle}>Τελειώσατε με τους συμμετέχοντες;</h3>
+                <p style={styles.modalMessage}>
+                  Αν ναι, θα επιστρέψετε στη φόρμα της εκδρομής για την τελική αποθήκευση της εκδρομής.
+                </p>
+                <p style={styles.modalMessage}>
+                  Αν όχι, συνεχίστε με τους συμμετέχοντες!
+                </p>
+                <div style={styles.modalActions}>
+                  <button onClick={handleConfirmSave} style={styles.modalYesBtn}>
+                    Ναι, επιστροφή στη φόρμα
+                  </button>
+                  <button onClick={handleCancelSave} style={styles.modalNoBtn}>
+                    Όχι, συνέχεια επεξεργασίας
+                  </button>
+                </div>
+              </div>
             </div>
         )}
       </div>
   );
 };
 
-// Styles (διατηρούνται όπως τα είχες με μικρές βελτιώσεις στο spacing)
 const styles = {
   container: { padding: '20px', maxWidth: '1200px', margin: '0 auto', minHeight: '100vh', backgroundColor: '#f5f7fa' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', gap: '20px', flexWrap: 'wrap', backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
   headerCenter: { flex: 1, textAlign: 'center' },
-  backBtn: { padding: '12px 24px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '500' },
+  headerRight: { display: 'flex', alignItems: 'center', gap: '15px' },
+  username: { color: '#555', fontSize: '16px' },
+  logoutBtn: { padding: '10px 20px', backgroundColor: '#e03131', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' },
   title: { margin: '0 0 5px 0', color: '#667eea', fontSize: '24px' },
   tripName: { margin: 0, color: '#555', fontSize: '16px' },
-  saveBtn: { padding: '12px 28px', backgroundColor: '#51cf66', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(81,207,102,0.3)' },
-  savingBtn: { backgroundColor: '#95a5a6', cursor: 'not-allowed' },
+  saveButtonContainer: { display: 'flex', justifyContent: 'center', marginBottom: '30px' },
+  saveBtn: { padding: '14px 40px', backgroundColor: '#51cf66', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(81,207,102,0.3)' },
   stats: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '30px' },
   statBox: { backgroundColor: '#f8f9fa', padding: '20px', borderRadius: '12px', textAlign: 'center', border: '2px solid #e9ecef' },
   statNumber: { display: 'block', fontSize: '32px', fontWeight: 'bold', color: '#667eea', marginBottom: '5px' },
@@ -211,8 +231,17 @@ const styles = {
   absentBadge: { backgroundColor: '#fff9db', color: '#f59f00' },
   notesContainer: { marginTop: '10px' },
   notesLabel: { display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500', color: '#555' },
-  notesInput: { width: '100%', minHeight: '80px', padding: '12px', border: '2px solid #e0e0e0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' },
-  emptyState: { textAlign: 'center', padding: '60px 20px', color: '#999', fontSize: '18px', backgroundColor: 'white', borderRadius: '12px' }
+  notesInput: { width: '100%', minHeight: '80px', padding: '12px', border: '2px solid #e0e0e0', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box', fontFamily: 'inherit' },
+  emptyState: { textAlign: 'center', padding: '60px 20px', color: '#999', fontSize: '18px', backgroundColor: 'white', borderRadius: '12px' },
+
+  // Modal styles
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
+  modalContent: { backgroundColor: 'white', borderRadius: '15px', padding: '30px', maxWidth: '500px', width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' },
+  modalTitle: { margin: '0 0 15px 0', fontSize: '22px', color: '#333', textAlign: 'center' },
+  modalMessage: { margin: '10px 0', fontSize: '16px', color: '#555', textAlign: 'center', lineHeight: '1.5' },
+  modalActions: { display: 'flex', gap: '15px', marginTop: '25px', justifyContent: 'center', flexWrap: 'wrap' },
+  modalYesBtn: { padding: '12px 30px', backgroundColor: '#51cf66', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(81,207,102,0.3)' },
+  modalNoBtn: { padding: '12px 30px', backgroundColor: '#667eea', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(102,126,234,0.3)' }
 };
 
 export default ParticipantManager;

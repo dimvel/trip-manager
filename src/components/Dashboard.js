@@ -3,18 +3,15 @@ import React, { useState, useEffect } from 'react';
 import TripList from './TripList';
 import TripForm from './TripForm';
 import ContactsManager from './ContactsManager';
-import ParticipantManager from './ParticipantManager';
 import { getUpcomingTrips, getArchivedTrips, autoArchiveTrips } from '../services/database';
 
 const Dashboard = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [showTripForm, setShowTripForm] = useState(false);
   const [showContacts, setShowContacts] = useState(false);
-  const [showParticipants, setShowParticipants] = useState(false);
   const [upcomingTrips, setUpcomingTrips] = useState([]);
   const [archivedTrips, setArchivedTrips] = useState([]);
   const [editingTrip, setEditingTrip] = useState(null);
-  const [managingTrip, setManagingTrip] = useState(null);
 
   useEffect(() => {
     loadTrips();
@@ -38,7 +35,6 @@ const Dashboard = ({ user, onLogout }) => {
     setShowTripForm(false);
     setEditingTrip(null);
     setShowContacts(false);
-    setShowParticipants(false);
     loadTrips();
   };
 
@@ -46,136 +42,105 @@ const Dashboard = ({ user, onLogout }) => {
     setEditingTrip(trip);
     setShowTripForm(true);
     setShowContacts(false);
-    setShowParticipants(false);
   };
 
   const handleNewTrip = () => {
     setEditingTrip(null);
     setShowTripForm(true);
     setShowContacts(false);
-    setShowParticipants(false);
-  };
-
-  const handleManageParticipants = (trip) => {
-    setManagingTrip(trip);
-    setShowParticipants(true);
-    setShowTripForm(false);
-    setShowContacts(false);
-  };
-
-  const handleParticipantsBack = () => {
-    setShowParticipants(false);
-    setManagingTrip(null);
-    setShowTripForm(false);
-    setShowContacts(false);
-    loadTrips();
   };
 
   // Contact manager handlers
   const handleContactsBack = () => {
     setShowContacts(false);
     setShowTripForm(false);
-    setShowParticipants(false);
   };
 
   if (showContacts) {
     return (
-      <ContactsManager
-        onBack={handleContactsBack}
-        user={user}
-        onLogout={onLogout}
-      />
-    );
-  }
-
-  if (showParticipants && managingTrip) {
-    return (
-      <ParticipantManager
-        trip={managingTrip}
-        onBack={handleParticipantsBack}
-        onUpdate={handleParticipantsBack}
-      />
+        <ContactsManager
+            onBack={handleContactsBack}
+            user={user}
+            onLogout={onLogout}
+        />
     );
   }
 
   if (showTripForm) {
     return (
-      <TripForm
-        trip={editingTrip}
-        onSave={handleTripSaved}
-        onCancel={() => {
-          setShowTripForm(false);
-          setEditingTrip(null);
-        }}
-        onManageParticipants={handleManageParticipants}
-        user={user}
-        onLogout={onLogout}
-      />
+        <TripForm
+            trip={editingTrip}
+            onSave={handleTripSaved}
+            onCancel={() => {
+              setShowTripForm(false);
+              setEditingTrip(null);
+            }}
+            user={user}
+            onLogout={onLogout}
+        />
     );
   }
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h1 style={styles.title}>Διαχείριση Εκδρομών</h1>
-        <div style={styles.headerRight}>
-          <span style={styles.username}>Καλώς ήρθες, {user.username}</span>
-          <button onClick={onLogout} style={styles.logoutBtn}>
-            Αποσύνδεση
+      <div style={styles.container}>
+        <header style={styles.header}>
+          <h1 style={styles.title}>Διαχείριση Εκδρομών</h1>
+          <div style={styles.headerRight}>
+            <span style={styles.username}>Καλώς ήρθες, {user.username}</span>
+            <button onClick={onLogout} style={styles.logoutBtn}>
+              Αποσύνδεση
+            </button>
+          </div>
+        </header>
+
+        <div style={styles.actions}>
+          <button onClick={handleNewTrip} style={styles.primaryBtn}>
+            + Νέα Εκδρομή
+          </button>
+          <button onClick={() => setShowContacts(true)} style={styles.secondaryBtn}>
+            Διαχείριση Επαφών
           </button>
         </div>
-      </header>
 
-      <div style={styles.actions}>
-        <button onClick={handleNewTrip} style={styles.primaryBtn}>
-          + Νέα Εκδρομή
-        </button>
-        <button onClick={() => setShowContacts(true)} style={styles.secondaryBtn}>
-          Διαχείριση Επαφών
-        </button>
-      </div>
+        <div style={styles.tabs}>
+          <button
+              onClick={() => setActiveTab('upcoming')}
+              style={{
+                ...styles.tab,
+                ...(activeTab === 'upcoming' ? styles.activeTab : {})
+              }}
+          >
+            Επερχόμενες Εκδρομές ({upcomingTrips.length})
+          </button>
+          <button
+              onClick={() => setActiveTab('archived')}
+              style={{
+                ...styles.tab,
+                ...(activeTab === 'archived' ? styles.activeTab : {})
+              }}
+          >
+            Αρχείο Εκδρομών ({archivedTrips.length})
+          </button>
+        </div>
 
-      <div style={styles.tabs}>
-        <button
-          onClick={() => setActiveTab('upcoming')}
-          style={{
-            ...styles.tab,
-            ...(activeTab === 'upcoming' ? styles.activeTab : {})
-          }}
-        >
-          Επερχόμενες Εκδρομές ({upcomingTrips.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('archived')}
-          style={{
-            ...styles.tab,
-            ...(activeTab === 'archived' ? styles.activeTab : {})
-          }}
-        >
-          Αρχείο Εκδρομών ({archivedTrips.length})
-        </button>
+        <div style={styles.content}>
+          {activeTab === 'upcoming' ? (
+              <TripList
+                  trips={upcomingTrips}
+                  onRefresh={loadTrips}
+                  onEdit={handleEditTrip}
+                  type="upcoming"
+              />
+          ) : (
+              <TripList
+                  trips={archivedTrips}
+                  onRefresh={loadTrips}
+                  onEdit={handleEditTrip}
+                  type="archived"
+              />
+          )}
+        </div>
       </div>
-
-      <div style={styles.content}>
-        {activeTab === 'upcoming' ? (
-          <TripList
-            trips={upcomingTrips}
-            onRefresh={loadTrips}
-            onEdit={handleEditTrip}
-            onManageParticipants={handleManageParticipants}
-            type="upcoming"
-          />
-        ) : (
-          <TripList
-            trips={archivedTrips}
-            onRefresh={loadTrips}
-            onEdit={handleEditTrip}
-            onManageParticipants={handleManageParticipants}
-            type="archived"
-          />
-        )}
-      </div>
-    </div>
   );
 };
 
