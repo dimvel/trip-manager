@@ -153,13 +153,14 @@ const TripList = ({ trips, onRefresh, onEdit, type }) => {
                             </button>
                         )}
 
-                        <button
-                            onClick={() => handleGeneratePDF(trip)}
-                            style={styles.pdfBtn}
-                            title="Εξαγωγή σε PDF"
-                        >
-                          📄 PDF
-                        </button>
+                        {/* TEMPORARILY DISABLED - PDF EXPORT */}
+                        {/* <button
+                    onClick={() => handleGeneratePDF(trip)}
+                    style={styles.pdfBtn}
+                    title="Εξαγωγή σε PDF"
+                  >
+                    📄 PDF
+                  </button> */}
 
                         {type === 'upcoming' && (
                             <button

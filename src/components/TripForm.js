@@ -196,17 +196,30 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
                       const contact = allContacts.find(c => (c._id === contactId || c.id === contactId));
                       if (!contact) return null;
 
+                      // Βρες τις σημειώσεις για αυτόν τον συμμετέχοντα
+                      const participantObj = participants.find(p =>
+                          (typeof p === 'object' ? p.contactId : p) === contactId
+                      );
+                      const notes = participantObj && typeof participantObj === 'object' ? participantObj.notes : '';
+
                       return (
                           <div key={contactId} style={styles.participantItem}>
                             <span style={styles.participantNumber}>{index + 1}.</span>
-                            <span style={styles.participantName}>
-                        {contact.firstName} {contact.lastName}
-                      </span>
-                            {contact.phone && (
-                                <span style={styles.participantPhone}>
-                          📞 {contact.phone}
+                            <div style={styles.participantInfo}>
+                        <span style={styles.participantName}>
+                          {contact.firstName} {contact.lastName}
                         </span>
-                            )}
+                              {contact.phone && (
+                                  <span style={styles.participantPhone}>
+                            📞 {contact.phone}
+                          </span>
+                              )}
+                              {notes && notes.trim() && (
+                                  <span style={styles.participantNotes}>
+                            📝 {notes}
+                          </span>
+                              )}
+                            </div>
                           </div>
                       );
                     })}
@@ -251,10 +264,12 @@ const styles = {
   participantsHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' },
   manageParticipantsBtn: { padding: '12px 24px', backgroundColor: '#7950f2', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '15px', fontWeight: '600', boxShadow: '0 4px 12px rgba(121,80,242,0.3)' },
   participantsList: { display: 'flex', flexDirection: 'column', gap: '10px' },
-  participantItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' },
-  participantNumber: { color: '#667eea', fontWeight: 'bold', fontSize: '16px', minWidth: '30px' },
-  participantName: { flex: 1, fontWeight: '600', fontSize: '15px', color: '#333' },
+  participantItem: { display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' },
+  participantNumber: { color: '#667eea', fontWeight: 'bold', fontSize: '16px', minWidth: '30px', marginTop: '2px' },
+  participantInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' },
+  participantName: { fontWeight: '600', fontSize: '15px', color: '#333' },
   participantPhone: { fontSize: '13px', color: '#777' },
+  participantNotes: { fontSize: '13px', color: '#555', fontStyle: 'italic', backgroundColor: '#fff3cd', padding: '6px 10px', borderRadius: '6px', border: '1px solid #ffc107' },
   error: { backgroundColor: '#fee', color: '#c33', padding: '15px', borderRadius: '8px', textAlign: 'center', fontWeight: '500' },
   actions: { display: 'flex', gap: '15px', justifyContent: 'center', paddingTop: '10px' },
   saveBtn: { padding: '14px 40px', backgroundColor: '#51cf66', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(81,207,102,0.3)' },

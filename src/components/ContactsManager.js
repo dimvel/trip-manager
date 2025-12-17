@@ -84,21 +84,67 @@ const ContactsManager = ({ onBack, user, onLogout }) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        setError('');
+
         Papa.parse(file, {
             header: true,
             skipEmptyLines: true,
+            transformHeader: (header) => {
+                // Καθαρισμός headers - αφαίρεση whitespace και normalization
+                return header.trim();
+            },
             complete: async (results) => {
+                console.log('CSV Parse Results:', results);
+
+                if (results.errors && results.errors.length > 0) {
+                    console.error('CSV Parse Errors:', results.errors);
+                }
+
+                if (!results.data || results.data.length === 0) {
+                    setError('Το αρχείο είναι κενό ή δεν μπορεί να διαβαστεί');
+                    return;
+                }
+
+                // Δοκίμασε διάφορα πιθανά ονόματα columns
                 const validContacts = results.data
-                    .filter(row => row.firstName && row.lastName)
-                    .map(row => ({
-                        firstName: row.firstName?.trim() || row['Όνομα']?.trim(),
-                        lastName: row.lastName?.trim() || row['Επώνυμο']?.trim(),
-                        phone: row.phone?.trim() || row['Τηλέφωνο']?.trim() || ''
-                    }))
-                    .filter(c => c.firstName && c.lastName);
+                    .filter(row => {
+                        // Έλεγξε αν υπάρχει τουλάχιστον ένα όνομα
+                        const hasFirstName = row.firstName || row.firstname || row.FirstName ||
+                            row['Όνομα'] || row['Ονομα'] || row['ΟΝΟΜΑ'] ||
+                            row['First Name'] || row['first name'];
+                        const hasLastName = row.lastName || row.lastname || row.LastName ||
+                            row['Επώνυμο'] || row['Επωνυμο'] || row['ΕΠΩΝΥΜΟ'] ||
+                            row['Last Name'] || row['last name'];
+                        return hasFirstName && hasLastName;
+                    })
+                    .map(row => {
+                        // Βρες το firstName από διάφορα πιθανά ονόματα
+                        const fName = row.firstName || row.firstname || row.FirstName ||
+                            row['Όνομα'] || row['Ονομα'] || row['ΟΝΟΜΑ'] ||
+                            row['First Name'] || row['first name'];
+
+                        // Βρες το lastName από διάφορα πιθανά ονόματα
+                        const lName = row.lastName || row.lastname || row.LastName ||
+                            row['Επώνυμο'] || row['Επωνυμο'] || row['ΕΠΩΝΥΜΟ'] ||
+                            row['Last Name'] || row['last name'];
+
+                        // Βρες το phone από διάφορα πιθανά ονόματα
+                        const ph = row.phone || row.Phone || row.PHONE ||
+                            row['Τηλέφωνο'] || row['Τηλεφωνο'] || row['ΤΗΛΕΦΩΝΟ'] ||
+                            row['Phone Number'] || row['phone number'] || '';
+
+                        return {
+                            firstName: (fName || '').toString().trim(),
+                            lastName: (lName || '').toString().trim(),
+                            phone: (ph || '').toString().trim()
+                        };
+                    })
+                    .filter(c => c.firstName && c.lastName); // Κράτησε μόνο αυτές με όνομα και επώνυμο
+
+                console.log('Valid Contacts:', validContacts);
 
                 if (validContacts.length === 0) {
-                    setError('Δεν βρέθηκαν έγκυρες επαφές στο αρχείο');
+                    setError('Δεν βρέθηκαν έγκυρες επαφές στο αρχείο. Βεβαιωθείτε ότι το CSV έχει στήλες firstName/Όνομα και lastName/Επώνυμο');
                     return;
                 }
 
@@ -107,11 +153,13 @@ const ContactsManager = ({ onBack, user, onLogout }) => {
                     loadContacts();
                     alert(`Εισήχθησαν επιτυχώς ${validContacts.length} επαφές!`);
                 } catch (err) {
-                    setError('Σφάλμα κατά την εισαγωγή');
+                    console.error('Import error:', err);
+                    setError('Σφάλμα κατά την εισαγωγή: ' + err.message);
                 }
             },
-            error: () => {
-                setError('Σφάλμα ανάγνωσης αρχείου');
+            error: (error) => {
+                console.error('Papa Parse Error:', error);
+                setError('Σφάλμα ανάγνωσης αρχείου: ' + error.message);
             }
         });
         e.target.value = '';
@@ -150,6 +198,12 @@ const ContactsManager = ({ onBack, user, onLogout }) => {
                         style={{ display: 'none' }}
                     />
                 </label>
+            </div>
+
+            {/* Οδηγίες για CSV */}
+            <div style={styles.csvInfo}>
+                <strong>💡 Οδηγίες CSV:</strong> Το αρχείο CSV πρέπει να έχει στήλες με ονόματα:
+                <code>firstName, lastName, phone</code> ή <code>Όνομα, Επώνυμο, Τηλέφωνο</code>
             </div>
 
             {showForm && (
@@ -359,6 +413,15 @@ const styles = {
         fontSize: '15px',
         fontWeight: '500',
         display: 'inline-block'
+    },
+    csvInfo: {
+        backgroundColor: '#e7f5ff',
+        border: '1px solid #339af0',
+        borderRadius: '8px',
+        padding: '12px 15px',
+        marginBottom: '20px',
+        fontSize: '14px',
+        color: '#1971c2'
     },
     formContainer: {
         backgroundColor: 'white',
