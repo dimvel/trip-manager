@@ -202,8 +202,9 @@ const ContactsManager = ({ onBack, user, onLogout }) => {
 
             {/* Οδηγίες για CSV */}
             <div style={styles.csvInfo}>
-                <strong>💡 Οδηγίες CSV:</strong> Το αρχείο CSV πρέπει να έχει στήλες με ονόματα:
-                <code>firstName, lastName, phone</code> ή <code>Όνομα, Επώνυμο, Τηλέφωνο</code>
+                <strong>💡 Οδηγίες CSV:</strong><br/>
+                Το αρχείο CSV πρέπει να έχει στήλες με ονόματα:<br/>
+                <code>Όνομα, Επώνυμο, Τηλέφωνο</code>
             </div>
 
             {showForm && (
