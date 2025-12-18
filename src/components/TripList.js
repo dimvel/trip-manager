@@ -22,8 +22,8 @@ const TripList = ({ trips, onRefresh, onEdit, type }) => {
     }
 
     // Count only checked participants
-    const confirmed = trip.participants.filter(p =>
-        typeof p === 'object' ? p.checked === true : true
+    const confirmed = trip.participants.filter(p => 
+      typeof p === 'object' ? p.checked === true : true
     ).length;
 
     return { total: confirmed, confirmed, unconfirmed: 0 };
@@ -52,7 +52,7 @@ const TripList = ({ trips, onRefresh, onEdit, type }) => {
     try {
       const allContacts = await getAllContacts();
       const result = generateTripPDF(trip, allContacts);
-
+      
       if (!result.success) {
         alert('Σφάλμα κατά τη δημιουργία του PDF');
       }
@@ -72,146 +72,151 @@ const TripList = ({ trips, onRefresh, onEdit, type }) => {
   };
 
   return (
-      <div>
-        <div style={styles.searchBar}>
+    <div>
+      <div style={styles.searchBar}>
+        <input
+          type="text"
+          placeholder="Αναζήτηση ονόματος εκδρομής..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={styles.searchInput}
+        />
+        <div style={styles.dateInputWrapper}>
           <input
-              type="text"
-              placeholder="Αναζήτηση ονόματος εκδρομής..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={styles.searchInput}
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            style={styles.dateInputWithIcon}
+            placeholder="Από ημερομηνία"
+            onClick={(e) => e.target.showPicker && e.target.showPicker()}
           />
-          <div style={styles.dateInputWrapper}>
-            <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                style={styles.dateInputWithIcon}
-                placeholder="Από ημερομηνία"
-                onClick={(e) => e.target.showPicker && e.target.showPicker()}
-            />
-            <span style={styles.calendarIcon}>📅</span>
-          </div>
-          <div style={styles.dateInputWrapper}>
-            <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                style={styles.dateInputWithIcon}
-                placeholder="Έως ημερομηνία"
-                onClick={(e) => e.target.showPicker && e.target.showPicker()}
-            />
-            <span style={styles.calendarIcon}>📅</span>
-          </div>
-          <button onClick={handleSearch} style={styles.searchBtn}>
-            Αναζήτηση
-          </button>
-          <button onClick={handleReset} style={styles.resetBtn}>
-            Επαναφορά
-          </button>
+          <span style={styles.calendarIcon}>📅</span>
         </div>
+        <div style={styles.dateInputWrapper}>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            style={styles.dateInputWithIcon}
+            placeholder="Έως ημερομηνία"
+            onClick={(e) => e.target.showPicker && e.target.showPicker()}
+          />
+          <span style={styles.calendarIcon}>📅</span>
+        </div>
+        <button onClick={handleSearch} style={styles.searchBtn}>
+          Αναζήτηση
+        </button>
+        <button onClick={handleReset} style={styles.resetBtn}>
+          Επαναφορά
+        </button>
+      </div>
 
-        {filteredTrips.length === 0 ? (
-            <div style={styles.emptyState}>
-              <p>Δεν υπάρχουν εκδρομές</p>
-            </div>
-        ) : (
-            <div style={styles.grid}>
-              {filteredTrips.map(trip => {
-                const counts = getParticipantCounts(trip);
-
-                return (
-                    <div key={trip._id} style={styles.card}>
-                      <div style={styles.cardHeader}>
-                        <h3 style={styles.cardTitle}>{trip.name}</h3>
-                        <div style={styles.badgeContainer}>
-                          {counts.total > 0 && (
-                              <div style={styles.badge}>
-                                {counts.total} συμμετέχοντες
-                              </div>
-                          )}
-                        </div>
+      {filteredTrips.length === 0 ? (
+        <div style={styles.emptyState}>
+          <p>Δεν υπάρχουν εκδρομές</p>
+        </div>
+      ) : (
+        <div style={styles.grid}>
+          {filteredTrips.map(trip => {
+            const counts = getParticipantCounts(trip);
+            
+            return (
+              <div key={trip._id} style={styles.card}>
+                <div style={styles.cardHeader}>
+                  <h3 style={styles.cardTitle}>{trip.name}</h3>
+                  <div style={styles.badgeContainer}>
+                    {counts.total > 0 && (
+                      <div style={styles.badge}>
+                        {counts.total} συμμετέχοντες
                       </div>
+                    )}
+                  </div>
+                </div>
+              
+                <div style={styles.cardBody}>
+                  <p style={styles.date}>
+                    📅 {formatDate(trip.date)}
+                  </p>
+                  <p style={styles.locations}>
+                    📍 {trip.locations.join(', ')}
+                  </p>
+                  {trip.notes && trip.notes.trim() && (
+                    <p style={styles.tripNotes}>
+                      📝 {trip.notes}
+                    </p>
+                  )}
+                </div>
 
-                      <div style={styles.cardBody}>
-                        <p style={styles.date}>
-                          📅 {formatDate(trip.date)}
-                        </p>
-                        <p style={styles.locations}>
-                          📍 {trip.locations.join(', ')}
-                        </p>
-                      </div>
-
-                      <div style={styles.cardActions}>
-                        {counts.total > 0 && (
-                            <button
-                                onClick={() => setShowDetailsModal(trip)}
-                                style={styles.detailsBtn}
-                                title="Δες λίστα συμμετεχόντων"
-                            >
-                              👥 Λίστα
-                            </button>
-                        )}
-
-                        {/* TEMPORARILY DISABLED - PDF EXPORT */}
-                        {/* <button
+                <div style={styles.cardActions}>
+                  {counts.total > 0 && (
+                    <button
+                      onClick={() => setShowDetailsModal(trip)}
+                      style={styles.detailsBtn}
+                      title="Δες λίστα συμμετεχόντων"
+                    >
+                      👥 Λίστα
+                    </button>
+                  )}
+                  
+                  {/* TEMPORARILY DISABLED - PDF EXPORT */}
+                  {/* <button
                     onClick={() => handleGeneratePDF(trip)}
                     style={styles.pdfBtn}
                     title="Εξαγωγή σε PDF"
                   >
                     📄 PDF
                   </button> */}
+                  
+                  {type === 'upcoming' && (
+                    <button
+                      onClick={() => onEdit(trip)}
+                      style={styles.editBtn}
+                    >
+                      ✏️ Επεξεργασία
+                    </button>
+                  )}
 
-                        {type === 'upcoming' && (
-                            <button
-                                onClick={() => onEdit(trip)}
-                                style={styles.editBtn}
-                            >
-                              ✏️ Επεξεργασία
-                            </button>
-                        )}
+                  <button
+                    onClick={() => setShowDeleteConfirm(trip._id)}
+                    style={styles.deleteBtn}
+                  >
+                    🗑️ Διαγραφή
+                  </button>
+                </div>
 
-                        <button
-                            onClick={() => setShowDeleteConfirm(trip._id)}
-                            style={styles.deleteBtn}
-                        >
-                          🗑️ Διαγραφή
-                        </button>
-                      </div>
-
-                      {showDeleteConfirm === trip._id && (
-                          <div style={styles.confirmDialog}>
-                            <p>Σίγουρα θέλετε να διαγράψετε αυτή την εκδρομή;</p>
-                            <div style={styles.confirmActions}>
-                              <button
-                                  onClick={() => handleDelete(trip._id)}
-                                  style={styles.confirmYes}
-                              >
-                                Ναι
-                              </button>
-                              <button
-                                  onClick={() => setShowDeleteConfirm(null)}
-                                  style={styles.confirmNo}
-                              >
-                                Όχι
-                              </button>
-                            </div>
-                          </div>
-                      )}
+                {showDeleteConfirm === trip._id && (
+                  <div style={styles.confirmDialog}>
+                    <p>Σίγουρα θέλετε να διαγράψετε αυτή την εκδρομή;</p>
+                    <div style={styles.confirmActions}>
+                      <button
+                        onClick={() => handleDelete(trip._id)}
+                        style={styles.confirmYes}
+                      >
+                        Ναι
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteConfirm(null)}
+                        style={styles.confirmNo}
+                      >
+                        Όχι
+                      </button>
                     </div>
-                );
-              })}
-            </div>
-        )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-        {/* Modal: Trip Details */}
-        {showDetailsModal && (
-            <TripDetailsModal
-                trip={showDetailsModal}
-                onClose={() => setShowDetailsModal(null)}
-            />
-        )}
-      </div>
+      {/* Modal: Trip Details */}
+      {showDetailsModal && (
+        <TripDetailsModal 
+          trip={showDetailsModal}
+          onClose={() => setShowDetailsModal(null)}
+        />
+      )}
+    </div>
   );
 };
 
@@ -255,86 +260,92 @@ const TripDetailsModal = ({ trip, onClose }) => {
   const { confirmed, unconfirmed } = getParticipantDetails();
 
   return (
-      <div style={styles.modalOverlay} onClick={onClose}>
-        <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-          <div style={styles.modalHeader}>
-            <h2 style={styles.modalTitle}>Λίστα Συμμετεχόντων</h2>
-            <button onClick={onClose} style={styles.modalCloseBtn}>✕</button>
-          </div>
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>Λίστα Συμμετεχόντων</h2>
+          <button onClick={onClose} style={styles.modalCloseBtn}>✕</button>
+        </div>
 
-          <div style={styles.modalTripInfo}>
-            <h3>{trip.name}</h3>
-            <p>📅 {new Date(trip.date).toLocaleDateString('el-GR')}</p>
-          </div>
+        <div style={styles.modalTripInfo}>
+          <h3>{trip.name}</h3>
+          <p>📅 {new Date(trip.date).toLocaleDateString('el-GR')}</p>
+          <p>📍 {trip.locations.join(', ')}</p>
+          {trip.notes && trip.notes.trim() && (
+            <div style={styles.modalTripNotes}>
+              <strong>Σημειώσεις:</strong> {trip.notes}
+            </div>
+          )}
+        </div>
 
-          <div style={styles.modalTabs}>
-            <button
-                onClick={() => setActiveTab('confirmed')}
-                style={{
-                  ...styles.modalTab,
-                  ...(activeTab === 'confirmed' ? styles.modalTabActive : {})
-                }}
-            >
-              ✅ Επιβεβαιωμένοι ({confirmed.length})
-            </button>
-            <button
-                onClick={() => setActiveTab('unconfirmed')}
-                style={{
-                  ...styles.modalTab,
-                  ...(activeTab === 'unconfirmed' ? styles.modalTabActive : {})
-                }}
-            >
-              ⏳ Μη Επιβεβαιωμένοι ({unconfirmed.length})
-            </button>
-          </div>
+        <div style={styles.modalTabs}>
+          <button
+            onClick={() => setActiveTab('confirmed')}
+            style={{
+              ...styles.modalTab,
+              ...(activeTab === 'confirmed' ? styles.modalTabActive : {})
+            }}
+          >
+            ✅ Επιβεβαιωμένοι ({confirmed.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('unconfirmed')}
+            style={{
+              ...styles.modalTab,
+              ...(activeTab === 'unconfirmed' ? styles.modalTabActive : {})
+            }}
+          >
+            ⏳ Μη Επιβεβαιωμένοι ({unconfirmed.length})
+          </button>
+        </div>
 
-          <div style={styles.modalBody}>
-            {activeTab === 'confirmed' ? (
-                confirmed.length === 0 ? (
-                    <p style={styles.modalEmpty}>Δεν υπάρχουν επιβεβαιωμένοι συμμετέχοντες</p>
-                ) : (
-                    <div style={styles.modalList}>
-                      {confirmed.map((contact, idx) => (
-                          <div key={contact._id} style={styles.modalListItem}>
-                            <span style={styles.modalListNumber}>{idx + 1}.</span>
-                            <div style={styles.modalListInfo}>
-                      <span style={styles.modalListName}>
-                        {contact.firstName} {contact.lastName}
-                      </span>
-                              {contact.phone && (
-                                  <span style={styles.modalListPhone}>📞 {contact.phone}</span>
-                              )}
-                            </div>
-                            <span style={styles.modalListStatus}>✅</span>
-                          </div>
-                      ))}
-                    </div>
-                )
+        <div style={styles.modalBody}>
+          {activeTab === 'confirmed' ? (
+            confirmed.length === 0 ? (
+              <p style={styles.modalEmpty}>Δεν υπάρχουν επιβεβαιωμένοι συμμετέχοντες</p>
             ) : (
-                unconfirmed.length === 0 ? (
-                    <p style={styles.modalEmpty}>Όλοι έχουν επιβεβαιώσει</p>
-                ) : (
-                    <div style={styles.modalList}>
-                      {unconfirmed.map((contact, idx) => (
-                          <div key={contact._id} style={styles.modalListItem}>
-                            <span style={styles.modalListNumber}>{idx + 1}.</span>
-                            <div style={styles.modalListInfo}>
+              <div style={styles.modalList}>
+                {confirmed.map((contact, idx) => (
+                  <div key={contact._id} style={styles.modalListItem}>
+                    <span style={styles.modalListNumber}>{idx + 1}.</span>
+                    <div style={styles.modalListInfo}>
                       <span style={styles.modalListName}>
                         {contact.firstName} {contact.lastName}
                       </span>
-                              {contact.phone && (
-                                  <span style={styles.modalListPhone}>📞 {contact.phone}</span>
-                              )}
-                            </div>
-                            <span style={styles.modalListStatus}>⏳</span>
-                          </div>
-                      ))}
+                      {contact.phone && (
+                        <span style={styles.modalListPhone}>📞 {contact.phone}</span>
+                      )}
                     </div>
-                )
-            )}
-          </div>
+                    <span style={styles.modalListStatus}>✅</span>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : (
+            unconfirmed.length === 0 ? (
+              <p style={styles.modalEmpty}>Όλοι έχουν επιβεβαιώσει</p>
+            ) : (
+              <div style={styles.modalList}>
+                {unconfirmed.map((contact, idx) => (
+                  <div key={contact._id} style={styles.modalListItem}>
+                    <span style={styles.modalListNumber}>{idx + 1}.</span>
+                    <div style={styles.modalListInfo}>
+                      <span style={styles.modalListName}>
+                        {contact.firstName} {contact.lastName}
+                      </span>
+                      {contact.phone && (
+                        <span style={styles.modalListPhone}>📞 {contact.phone}</span>
+                      )}
+                    </div>
+                    <span style={styles.modalListStatus}>⏳</span>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
         </div>
       </div>
+    </div>
   );
 };
 
@@ -456,7 +467,18 @@ const styles = {
   },
   locations: {
     color: '#777',
-    fontSize: '14px'
+    fontSize: '14px',
+    marginBottom: '8px'
+  },
+  tripNotes: {
+    color: '#555',
+    fontSize: '14px',
+    fontStyle: 'italic',
+    backgroundColor: '#fff3cd',
+    padding: '10px',
+    borderRadius: '6px',
+    border: '1px solid #ffc107',
+    marginTop: '10px'
   },
   cardActions: {
     display: 'flex',
@@ -593,6 +615,15 @@ const styles = {
     padding: '15px 20px',
     backgroundColor: '#f8f9fa',
     borderBottom: '1px solid #e9ecef'
+  },
+  modalTripNotes: {
+    marginTop: '10px',
+    padding: '10px',
+    backgroundColor: '#fff3cd',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontStyle: 'italic',
+    border: '1px solid #ffc107'
   },
   modalTabs: {
     display: 'flex',

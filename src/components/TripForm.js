@@ -8,14 +8,15 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
   const [name, setName] = useState('');
   const [date, setDate] = useState('');
   const [locations, setLocations] = useState('');
+  const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
 
   // --- Participants State (ΠΡΟΣΩΡΙΝΟ - δεν αποθηκεύεται στη βάση μέχρι το submit) ---
   const [participants, setParticipants] = useState([]);
-
+  
   // --- View State ---
   const [showParticipantManager, setShowParticipantManager] = useState(false);
-
+  
   // --- Contacts State ---
   const [allContacts, setAllContacts] = useState([]);
 
@@ -36,6 +37,7 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
       setName(trip.name || '');
       setDate(trip.date || '');
       setLocations(trip.locations ? trip.locations.join(', ') : '');
+      setNotes(trip.notes || '');
       setParticipants(trip.participants || []);
     }
   }, [trip]);
@@ -43,13 +45,13 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
   // Get confirmed participants count
   const getConfirmedParticipants = () => {
     if (!participants) return [];
-
+    
     return participants
-        .filter(p => {
-          if (typeof p === 'object') return p.checked === true;
-          return true;
-        })
-        .map(p => typeof p === 'string' ? p : p.contactId);
+      .filter(p => {
+        if (typeof p === 'object') return p.checked === true;
+        return true;
+      })
+      .map(p => typeof p === 'string' ? p : p.contactId);
   };
 
   const confirmedParticipants = getConfirmedParticipants();
@@ -75,6 +77,7 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
       name,
       date,
       locations: locationArray,
+      notes: notes || '',
       participants: participants, // Χρησιμοποιεί το state που ενημερώθηκε από τον ParticipantManager
       status: 'upcoming'
     };
@@ -105,141 +108,155 @@ const TripForm = ({ trip, onSave, onCancel, user, onLogout }) => {
   // Αν είμαστε στον ParticipantManager, εμφάνισέ τον
   if (showParticipantManager) {
     return (
-        <ParticipantManager
-            tripName={name || 'Νέα Εκδρομή'}
-            participants={participants}
-            onSave={handleParticipantsSave}
-            user={user}
-            onLogout={onLogout}
-        />
+      <ParticipantManager
+        tripName={name || 'Νέα Εκδρομή'}
+        participants={participants}
+        onSave={handleParticipantsSave}
+        user={user}
+        onLogout={onLogout}
+      />
     );
   }
 
   // Αλλιώς εμφάνισε το form
   return (
-      <div style={styles.container}>
-        <header style={styles.header}>
-          <h1 style={styles.title}>
-            {trip ? 'Επεξεργασία Εκδρομής' : 'Νέα Εκδρομή'}
-          </h1>
-          <div style={styles.headerRight}>
-            <span style={styles.username}>{user?.username || 'Χρήστης'}</span>
-            <button onClick={onLogout} style={styles.logoutBtn}>
-              Αποσύνδεση
-            </button>
-          </div>
-        </header>
+    <div style={styles.container}>
+      <header style={styles.header}>
+        <h1 style={styles.title}>
+          {trip ? 'Επεξεργασία Εκδρομής' : 'Νέα Εκδρομή'}
+        </h1>
+        <div style={styles.headerRight}>
+          <span style={styles.username}>{user?.username || 'Χρήστης'}</span>
+          <button onClick={onLogout} style={styles.logoutBtn}>
+            Αποσύνδεση
+          </button>
+        </div>
+      </header>
 
-        <div style={styles.formContainer}>
-          <form onSubmit={handleSubmit} style={styles.form}>
-            <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>Βασικές Πληροφορίες</h2>
+      <div style={styles.formContainer}>
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>Βασικές Πληροφορίες</h2>
 
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Όνομα Εκδρομής *</label>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Όνομα Εκδρομής *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                style={styles.input}
+                placeholder="π.χ. Εκδρομή στα Μετέωρα"
+              />
+            </div>
+
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Ημερομηνία *</label>
+              <div style={styles.dateInputWrapper}>
                 <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    style={styles.input}
-                    placeholder="π.χ. Εκδρομή στα Μετέωρα"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  style={styles.dateInput}
+                  onClick={(e) => e.target.showPicker && e.target.showPicker()}
                 />
-              </div>
-
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Ημερομηνία *</label>
-                <div style={styles.dateInputWrapper}>
-                  <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      style={styles.dateInput}
-                      onClick={(e) => e.target.showPicker && e.target.showPicker()}
-                  />
-                  <span style={styles.calendarIcon}>📅</span>
-                </div>
-              </div>
-
-              <div style={styles.inputGroup}>
-                <label style={styles.label}>Τοποθεσίες * (χωρίστε με κόμμα)</label>
-                <input
-                    type="text"
-                    value={locations}
-                    onChange={(e) => setLocations(e.target.value)}
-                    style={styles.input}
-                    placeholder="π.χ. Καλαμπάκα, Μετέωρα, Τρίκαλα"
-                />
+                <span style={styles.calendarIcon}>📅</span>
               </div>
             </div>
 
-            <div style={styles.section}>
-              <div style={styles.participantsHeader}>
-                <h2 style={styles.sectionTitle}>
-                  Συμμετέχοντες ({confirmedParticipants.length})
-                </h2>
-                <button
-                    type="button"
-                    onClick={handleOpenParticipantManager}
-                    style={styles.manageParticipantsBtn}
-                >
-                  {participants.length > 0 ? '✏️ Επεξεργασία Συμμετεχόντων' : '+ Προσθήκη Συμμετεχόντων'}
-                </button>
-              </div>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Τοποθεσίες * (χωρίστε με κόμμα)</label>
+              <input
+                type="text"
+                value={locations}
+                onChange={(e) => setLocations(e.target.value)}
+                style={styles.input}
+                placeholder="π.χ. Καλαμπάκα, Μετέωρα, Τρίκαλα"
+              />
+            </div>
 
-              {confirmedParticipants.length === 0 ? (
-                  <p style={styles.noParticipants}>
-                    Δεν υπάρχουν συμμετέχοντες. Πατήστε "Προσθήκη Συμμετεχόντων" για να προσθέσετε.
-                  </p>
-              ) : (
-                  <div style={styles.participantsList}>
-                    {confirmedParticipants.map((contactId, index) => {
-                      const contact = allContacts.find(c => (c._id === contactId || c.id === contactId));
-                      if (!contact) return null;
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>
+                Σημειώσεις Εκδρομής ({notes.length}/1000)
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value.substring(0, 1000))}
+                style={styles.textarea}
+                placeholder="Προσθέστε σημειώσεις για την εκδρομή (π.χ. ώρα συγκέντρωσης, κόστος, απαιτούμενα έγγραφα...)"
+                maxLength={1000}
+                rows={4}
+              />
+            </div>
+          </div>
 
-                      // Βρες τις σημειώσεις για αυτόν τον συμμετέχοντα
-                      const participantObj = participants.find(p =>
-                          (typeof p === 'object' ? p.contactId : p) === contactId
-                      );
-                      const notes = participantObj && typeof participantObj === 'object' ? participantObj.notes : '';
+          <div style={styles.section}>
+            <div style={styles.participantsHeader}>
+              <h2 style={styles.sectionTitle}>
+                Συμμετέχοντες ({confirmedParticipants.length})
+              </h2>
+              <button
+                type="button"
+                onClick={handleOpenParticipantManager}
+                style={styles.manageParticipantsBtn}
+              >
+                {participants.length > 0 ? '✏️ Επεξεργασία Συμμετεχόντων' : '+ Προσθήκη Συμμετεχόντων'}
+              </button>
+            </div>
 
-                      return (
-                          <div key={contactId} style={styles.participantItem}>
-                            <span style={styles.participantNumber}>{index + 1}.</span>
-                            <div style={styles.participantInfo}>
+            {confirmedParticipants.length === 0 ? (
+              <p style={styles.noParticipants}>
+                Δεν υπάρχουν συμμετέχοντες. Πατήστε "Προσθήκη Συμμετεχόντων" για να προσθέσετε.
+              </p>
+            ) : (
+              <div style={styles.participantsList}>
+                {confirmedParticipants.map((contactId, index) => {
+                  const contact = allContacts.find(c => (c._id === contactId || c.id === contactId));
+                  if (!contact) return null;
+
+                  // Βρες τις σημειώσεις για αυτόν τον συμμετέχοντα
+                  const participantObj = participants.find(p => 
+                    (typeof p === 'object' ? p.contactId : p) === contactId
+                  );
+                  const notes = participantObj && typeof participantObj === 'object' ? participantObj.notes : '';
+
+                  return (
+                    <div key={contactId} style={styles.participantItem}>
+                      <span style={styles.participantNumber}>{index + 1}.</span>
+                      <div style={styles.participantInfo}>
                         <span style={styles.participantName}>
                           {contact.firstName} {contact.lastName}
                         </span>
-                              {contact.phone && (
-                                  <span style={styles.participantPhone}>
+                        {contact.phone && (
+                          <span style={styles.participantPhone}>
                             📞 {contact.phone}
                           </span>
-                              )}
-                              {notes && notes.trim() && (
-                                  <span style={styles.participantNotes}>
+                        )}
+                        {notes && notes.trim() && (
+                          <span style={styles.participantNotes}>
                             📝 {notes}
                           </span>
-                              )}
-                            </div>
-                          </div>
-                      );
-                    })}
-                  </div>
-              )}
-            </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-            {error && <div style={styles.error}>{error}</div>}
+          {error && <div style={styles.error}>{error}</div>}
 
-            <div style={styles.actions}>
-              <button type="submit" style={styles.saveBtn}>
-                {trip ? 'Ενημέρωση' : 'Δημιουργία'} Εκδρομής
-              </button>
-              <button type="button" onClick={onCancel} style={styles.cancelBtn}>
-                Ακύρωση
-              </button>
-            </div>
-          </form>
-        </div>
+          <div style={styles.actions}>
+            <button type="submit" style={styles.saveBtn}>
+              {trip ? 'Ενημέρωση' : 'Δημιουργία'} Εκδρομής
+            </button>
+            <button type="button" onClick={onCancel} style={styles.cancelBtn}>
+              Ακύρωση
+            </button>
+          </div>
+        </form>
       </div>
+    </div>
   );
 };
 
@@ -257,6 +274,7 @@ const styles = {
   inputGroup: { marginBottom: '20px' },
   label: { display: 'block', marginBottom: '8px', color: '#555', fontWeight: '500', fontSize: '15px' },
   input: { width: '100%', padding: '12px', border: '2px solid #e0e0e0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box' },
+  textarea: { width: '100%', padding: '12px', border: '2px solid #e0e0e0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical', minHeight: '100px' },
   dateInputWrapper: { position: 'relative', width: '100%' },
   dateInput: { width: '100%', padding: '12px', paddingRight: '40px', border: '2px solid #e0e0e0', borderRadius: '8px', fontSize: '15px', boxSizing: 'border-box', cursor: 'pointer' },
   calendarIcon: { position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '20px', pointerEvents: 'none' },

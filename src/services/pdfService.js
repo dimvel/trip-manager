@@ -20,10 +20,10 @@ export const generateTripPDF = (trip, allContacts) => {
     addTitle(doc, trip);
     
     // Add trip information
-    addTripInfo(doc, trip, participantDetails);
+    const infoEndY = addTripInfo(doc, trip, participantDetails);
     
     // Add participants table
-    addParticipantsTable(doc, participantDetails);
+    addParticipantsTable(doc, participantDetails, infoEndY);
     
     // Add footer
     addFooter(doc);
@@ -79,6 +79,7 @@ const addTitle = (doc, trip) => {
 
 /**
  * Add trip information section
+ * @returns {number} Y position after trip info
  */
 const addTripInfo = (doc, trip, participantDetails) => {
   doc.setFontSize(12);
@@ -91,20 +92,53 @@ const addTripInfo = (doc, trip, participantDetails) => {
     day: 'numeric'
   });
   
-  doc.text(`Όνομα: ${trip.name}`, 20, 40);
-  doc.text(`Ημερομηνία: ${dateStr}`, 20, 50);
-  doc.text(`Τοποθεσίες: ${trip.locations.join(', ')}`, 20, 60);
-  doc.text(`Συμμετέχοντες: ${participantDetails.length}`, 20, 70);
+  let currentY = 40;
+  
+  doc.text(`Όνομα: ${trip.name}`, 20, currentY);
+  currentY += 10;
+  
+  doc.text(`Ημερομηνία: ${dateStr}`, 20, currentY);
+  currentY += 10;
+  
+  doc.text(`Τοποθεσίες: ${trip.locations.join(', ')}`, 20, currentY);
+  currentY += 10;
+  
+  doc.text(`Συμμετέχοντες: ${participantDetails.length}`, 20, currentY);
+  currentY += 10;
+  
+  // Add trip notes if they exist
+  if (trip.notes && trip.notes.trim()) {
+    currentY += 5;
+    doc.setFontSize(11);
+    doc.setTextColor(80, 80, 80);
+    doc.text('Σημειώσεις Εκδρομής:', 20, currentY);
+    currentY += 8;
+    
+    // Split notes into lines that fit the page width
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    const notesLines = doc.splitTextToSize(trip.notes, 170);
+    
+    // Add a background box for notes
+    const notesHeight = notesLines.length * 6 + 10;
+    doc.setFillColor(255, 243, 205); // Light yellow
+    doc.rect(15, currentY - 5, 180, notesHeight, 'F');
+    
+    doc.text(notesLines, 20, currentY);
+    currentY += notesLines.length * 6 + 10;
+  }
+  
+  return currentY;
 };
 
 /**
  * Add participants table
  */
-const addParticipantsTable = (doc, participantDetails) => {
+const addParticipantsTable = (doc, participantDetails, startY) => {
   if (participantDetails.length === 0) {
     doc.setFontSize(10);
     doc.setTextColor(150, 150, 150);
-    doc.text('Δεν υπάρχουν συμμετέχοντες', 105, 100, { align: 'center' });
+    doc.text('Δεν υπάρχουν συμμετέχοντες', 105, startY + 20, { align: 'center' });
     return;
   }
 
@@ -131,7 +165,7 @@ const addParticipantsTable = (doc, participantDetails) => {
   });
 
   doc.autoTable({
-    startY: 80,
+    startY: startY + 10,
     head: [headers],
     body: tableData,
     theme: 'grid',
